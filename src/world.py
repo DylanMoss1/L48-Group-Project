@@ -2,6 +2,7 @@ import random
 from species import Species
 import math
 from pprint import pprint
+from tabulate import tabulate
 
 
 class Food:
@@ -18,7 +19,7 @@ class Food:
         """
         Initialise a Food object.
         """
-        self.value
+        self.value = 1
 
 
 class Location:
@@ -52,11 +53,17 @@ class Location:
         """
         self.species_list.append(species)
 
-    def get_species_id_list(self):
-        return list(map(self.species_list, lambda species: species.id))
+    def get_species_id_list(self) -> list[Species]:
+        """
+        TODO: finish documentation
+        """
+        return list(map(lambda species: str(species.id), self.species_list))
 
-    def get_food_value_list(self):
-        return list(map(self.food_list, lambda food: food.value))
+    def get_food_value_list(self) -> list[Food]:
+        """
+        TODO: finish documentation
+        """
+        return list(map(lambda food: str(food.value), self.food_list))
 
 
 class World:
@@ -148,6 +155,7 @@ class World:
             If true, pretty print all species traits in a table (default is True)
         """
 
+        # Pretty print self.grid
         if display_grid:
             for row in self.grid:
                 for location in row:
@@ -158,53 +166,25 @@ class World:
                     location_string += "/".join(location.get_food_value_list())
                     if location_string == "":
                         location_string = "-"
-                    print(location_string.rjust(7), end=" " * 7)
-
-                # for optional_species in row:
-                #     if optional_species:
-                #         species = optional_species
-                #         print(str(species.id).rjust(2), end="   ")
-                #     else:
-                #         print("-".rjust(2), end="   ")
+                    print(location_string.rjust(4), end=" " * 4)
                 print()
 
         print("\n")
 
-#   def add_food_to_food_grid(self):
-#     # Add food to self.food_grid based on current temperate
+        # Pretty print all species traits in a table
+        if display_traits:
+            species_traits_list = []
 
-#     self.temperate = self.compute_temperature()
+            for row in self.grid:
+                for location in row:
+                    for species in location.species_list:
+                        species_traits_list.append(
+                            [species.id, species.size, species.speed, species.vision, species.aggression])
 
-#   def pprint(self, display_grid=True, display_traits=True) -> None:
-#     # Pretty print self.species_grid to console
+            species_traits_list.sort(
+                key=lambda species_traits: species_traits[0])
 
-#     # Print out species on the grid
-#     if display_grid:
-#       for row in self.species_grid:
-#         for optional_species in row:
-#           if optional_species:
-#             species = optional_species
-#             print(str(species.id).rjust(2), end="   ")
-#           else:
-#             print("-".rjust(2), end="   ")
-#         print()
+            table = [['Species ID', 'Size', 'Speed',
+                      'Vision', 'Aggression']] + species_traits_list
 
-#       print("\n")
-
-#     # Print out traits of living species in a table
-#     if display_traits:
-
-#       # Find all species in the grid
-#       species_traits_list = []
-
-#       for row in self.species_grid:
-#         for optional_species in row:
-#           if optional_species:
-#             species = optional_species
-#             species_traits_list.append([species.id, species.size, species.speed, species.vision, species.aggression])
-
-#       species_traits_list.sort(key=lambda species_traits: species_traits[0])
-
-#       table = [['Species ID', 'Size', 'Speed', 'Vision', 'Aggression']] + species_traits_list
-
-#       print(tabulate(table, headers='firstrow', tablefmt='fancygrid'))
+            print(tabulate(table, headers='firstrow', tablefmt='fancygrid'))
