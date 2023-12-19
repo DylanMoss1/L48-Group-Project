@@ -1,25 +1,10 @@
 import random
 from species import Species
+from food import Food
 import math
 from pprint import pprint
 from tabulate import tabulate
-
-
-class Food:
-    """
-    A class representing food on the simulation grid.
-
-    Attributes
-    ----------
-    value : int 
-        Represents how much food there is
-    """
-
-    def __init__(self) -> None:
-        """
-        Initialise a Food object.
-        """
-        self.value = 1
+from termcolor import colored
 
 
 class Location:
@@ -32,7 +17,6 @@ class Location:
         Stores a list of all species currently in this location
     food_list : list(Food)
         Stores a list of all food currently in this location
-
     """
 
     def __init__(self) -> None:
@@ -48,22 +32,28 @@ class Location:
 
         Parameters
         ----------
-        species: Species
+        species : Species
             The species object to be added to self.species_list
         """
         self.species_list.append(species)
 
+    def add_food(self) -> None:
+        """
+        Add a new food object to self.food_list.
+        """
+        self.food_list.append(Food())
+
     def get_species_id_list(self) -> list[Species]:
         """
-        TODO: finish documentation
+        Returns a list containing string(species.id) for each species in self.species_list.
         """
-        return list(map(lambda species: str(species.id), self.species_list))
+        return [str(species.id) for species in self.species_list]
 
     def get_food_value_list(self) -> list[Food]:
         """
-        TODO: finish documentation
+        Returns a list containing string(food.value) for each food in self.food_list.
         """
-        return list(map(lambda food: str(food.value), self.food_list))
+        return [str(food.value) for food in self.food_list]
 
 
 class World:
@@ -87,13 +77,14 @@ class World:
         Initialise the World object.
         """
         self.grid_length_size = 20
-        self.num_initial_species = 5
+        self.num_initial_species = 50
         self.days = 0
 
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
         ]
         self.populate_grid()
+        self.add_food_to_grid()  # TODO: remove
 
     def populate_grid(self) -> None:
         """
@@ -118,9 +109,14 @@ class World:
 
         This takes into account both (periodic) seasonal variance and (linear) climate change.
 
-        We compute seasonal variance as: 8 - 18cos(2π * days / 365) as seen in Chapter 4.2 of https://link.springer.com/article/10.1007/s11538-008-9389-z
+        We compute seasonal variance as: 8 - 18cos(2π * days / 365) as seen in Chapter 4.2 of https://link.springer.com/article/10.1007/s11538-008-9389-z.
 
-        TODO: implement climate change         
+        TODO: implement climate change
+
+        Returns
+        -------
+        temperature : float 
+            Temperature on the current day
         """
 
         return 8 - 18 * math.cos(2 * math.pi * self.days / 365)
@@ -133,15 +129,26 @@ class World:
             probability_of_food = scalar * exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
 
         TODO: find a scientific backing behind how food availability depends on temperature  
-        """
 
+        Returns 
+        -------
+        probability_of_food : float
+            Probability of a food being generated in any location 
+        """
         optimal_temperature = 10  # TODO: find a better optimal_temperature value
         scalar = 0.1
-        sigma = 1.0
+        sigma = 10
 
         temperature = self.compute_temperature()
+        probability_of_food = scalar * \
+            math.exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
 
-        return scalar * math.exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
+        for row in self.grid:
+            for location in row:
+                if random.random() < probability_of_food:
+                    location.add_food()
+
+        return probability_of_food
 
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
@@ -149,29 +156,43 @@ class World:
 
         Parameters
         ----------
-        display_grid: bool
-            If true, pretty print self.grid (default is True)
-        display_traits: bool
-            If true, pretty print all species traits in a table (default is True)
+        display_grid : bool
+            If true, pretty print self.grid (default is True).
+            Each location is represented as s1,...,sn||f1,...,fn for species ids s1,...,sn and food values f1,...,fn in each location.
+            E.g. 1,3||2,2 represents species objects with ids 1 and 3, and food objects of values 2 and 2, occupying this location
+        display_traits : bool
+            If true, pretty print all traits of living species in a table (default is True)
         """
 
         # Pretty print self.grid
         if display_grid:
-            for row in self.grid:
-                for location in row:
-                    location_string = ""  # String to be printed out for this grid location
-                    location_string += "/".join(location.get_species_id_list())
-                    if location.species_list and location.food_list:
-                        location_string += "||"
-                    location_string += "/".join(location.get_food_value_list())
-                    if location_string == "":
-                        location_string = "-"
-                    print(location_string.rjust(4), end=" " * 4)
-                print()
 
-        print("\n")
+            pprint_grid = [[None for _ in range(self.grid_length_size)] for _ in range(
+                self.grid_length_size)]
 
-        # Pretty print all species traits in a table
+            for row_index, row in enumerate(self.grid):
+                for col_index, location in enumerate(row):
+                    pprint_location = ""
+                    species_id_list = location.get_species_id_list()
+                    food_value_list = location.get_food_value_list()
+
+                    if species_id_list or food_value_list:
+                        if species_id_list:
+                            pprint_location += colored(
+                                ",".join(species_id_list), "light_blue")
+                        pprint_location += "||"
+                        if food_value_list:
+                            pprint_location += colored(
+                                ",".join(food_value_list), "light_red")
+                    else: 
+                        pprint_location = "⠀" * 3 
+ 
+                    pprint_grid[row_index][col_index] = pprint_location
+
+            print(tabulate(pprint_grid, tablefmt='rounded_grid', stralign='center'))
+            print("\n")
+
+        # Pretty print all traits of living species in a table
         if display_traits:
             species_traits_list = []
 
