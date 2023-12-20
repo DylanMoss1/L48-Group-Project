@@ -160,7 +160,6 @@ class World:
         temperature = self.compute_temperature()
         probability_of_food = scalar * \
             math.exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
-
         for row in self.grid:
             for location in row:
                 if random.random() < probability_of_food:
@@ -210,7 +209,6 @@ class World:
 
                                 self.grid[row_index][col_index].species_list.remove(species)
                                 moved_species.append(species.id)  
-        self.hour+=1
         pass
 
     def species_consume_food(self) -> None:
@@ -220,11 +218,32 @@ class World:
         If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics. 
         """
 
-        '''for row_index, row in enumerate(self.grid):
+        for row_index, row in enumerate(self.grid):
                 for col_index, location in enumerate(row):
-                    if len(location.species_list)>0 and len(location.food_list):
-                        i ='''
+                    if len(location.species_list)>0 and len(location.food_list)>0:
+                        aggression = [species.aggression for species in location.species_list]
+                        if all(aggr<=1 for aggr in aggression):
+                            for species in location.species_list:
+                                species.energy += len(location.food_list)/len(location.species_list)
+                        else:
+                            winner_hawk_indices = [i for i,j in enumerate(aggression)if j == max(aggression)]
+                            if len(winner_hawk_indices)==1:
+                                max_damage = max([i for i in aggression if i < max(aggression)])
+                                if max_damage<=1:
+                                    max_damage=0
+                            else:
+                                max_damage = max(aggression)    
+                            winner_hawk = location.species_list[random.sample(winner_hawk_indices,1)].id
+                            for species in location.species_list:
+                                if species.aggression>1 :
+                                    if species.id == winner_hawk:
+                                        species.energy+= len(location.food_list)
+                                        species.energy-= max_damage/2
+                                    else:
+                                        species.energy-= species.aggression/2
+                        location.food_list =[]
         pass
+
 
     def species_reproduce(self) -> None:
         """
