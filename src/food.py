@@ -12,4 +12,5 @@ class Food:
         """
         Initialise a Food object.
         """
+        
         self.value = 1

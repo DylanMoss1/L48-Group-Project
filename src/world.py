@@ -76,15 +76,29 @@ class World:
         """
         Initialise the World object.
         """
+
         self.grid_length_size = 20
         self.num_initial_species = 50
-        self.days = 0
+        self.day = 0
 
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
         ]
         self.populate_grid()
-        self.add_food_to_grid()  # TODO: remove
+
+    def compute_timestep(self) -> None:
+        """
+        Perform a timestep on the World simulation. 
+        """
+
+        self.day += 1
+        self.add_food_to_grid()
+        self.species_move()
+        self.species_consume_food()
+        self.species_reproduce()
+        is_extinct = self.species_die()
+
+        return is_extinct
 
     def populate_grid(self) -> None:
         """
@@ -119,7 +133,7 @@ class World:
             Temperature on the current day
         """
 
-        return 8 - 18 * math.cos(2 * math.pi * self.days / 365)
+        return 8 - 18 * math.cos(2 * math.pi * self.day / 365)
 
     def add_food_to_grid(self) -> None:
         """
@@ -135,6 +149,7 @@ class World:
         probability_of_food : float
             Probability of a food being generated in any location 
         """
+
         optimal_temperature = 10  # TODO: find a better optimal_temperature value
         scalar = 0.1
         sigma = 10
@@ -150,6 +165,18 @@ class World:
 
         return probability_of_food
 
+    def species_move(self) -> None: 
+        pass 
+    
+    def species_consume_food(self) -> None: 
+        pass 
+    
+    def species_reproduce(self) -> None: 
+        pass 
+    
+    def species_die(self) -> bool: 
+        pass 
+    
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
         Pretty print the World's current state. 
@@ -184,9 +211,9 @@ class World:
                         if food_value_list:
                             pprint_location += colored(
                                 ",".join(food_value_list), "light_red")
-                    else: 
-                        pprint_location = "⠀" * 3 
- 
+                    else:
+                        pprint_location = "⠀" * 3
+
                     pprint_grid[row_index][col_index] = pprint_location
 
             print(tabulate(pprint_grid, tablefmt='rounded_grid', stralign='center'))
