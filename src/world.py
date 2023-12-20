@@ -184,7 +184,7 @@ class World:
 
     def species_reproduce(self) -> None:
         """
-        If a species has more than N energy, they split into two species with N/2 energy. 
+        If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
 
         TODO: Decide a reasonable value for N
         """
