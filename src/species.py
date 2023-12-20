@@ -45,4 +45,5 @@ class Species:
         self.aggression = 1
         self.energy = 5 
         self.has_moved = False
+        self.death = False
         self.last_moved_direction = None
