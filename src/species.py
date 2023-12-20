@@ -39,10 +39,10 @@ class Species:
         """
 
         self.id = get_new_species_id()
-        self.size = 0
-        self.speed = 0
-        self.vision = 0
-        self.aggression = 0
+        self.size = 1
+        self.speed = 1
+        self.vision = 1
+        self.aggression = 1
         self.energy = 5 
         self.has_moved = False
         self.last_moved_directon = None
