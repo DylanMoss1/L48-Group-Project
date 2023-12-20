@@ -96,8 +96,7 @@ class World:
         self.day += 1
         # probability_of_food stored for logging purposes
         probability_of_food = self.add_food_to_grid()
-        self.species_move()
-        self.species_consume_food()
+        self.species_move_and_eat()
         self.species_reproduce()
         is_extinct = self.species_die()
         self.hour = 0
@@ -174,7 +173,9 @@ class World:
         Note that this cannot be in the direction they moved last. 
         """
 
-        '''TODO: Add vision
+        '''
+        TODO: Add vision
+        TODO: Add hibernate
         '''
         speed_modifier = 10 
         '''TODO: Find a better speed modifier
@@ -244,13 +245,35 @@ class World:
                         location.food_list =[]
         pass
 
+    def species_move_and_eat(self) -> None:
+        '''
+        TODO: Add speed related energy waste
+        '''
+        for hour in range(self.max_hours):
+            self.species_move()
+            self.species_consume_food()
+            self.hour+=1
+        for row_index, row in enumerate(self.grid):
+                for col_index, location in enumerate(row):
+                    for species in location.species_list:
+                        species.energy-=0.5    
+        pass    
 
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
 
         TODO: Decide a reasonable value for N
+
+        TODO: Add genetic drift
+
         """
+        reproduction_threshold = 6 #placeholder value
+        for row_index, row in enumerate(self.grid):
+                for col_index, location in enumerate(row):
+                    for species in location.species_list:
+                        if species.energy>= reproduction_threshold:
+                            location.add_species(Species())     
         pass
 
     def species_die(self) -> bool:
@@ -262,7 +285,16 @@ class World:
         is_extinct : bool 
             This is true if all species have died.  
         """
-        pass
+        num_alive = False
+        for row_index, row in enumerate(self.grid):
+                for col_index, location in enumerate(row):
+                    for species in location.species_list:
+                        if species.energy<=0:
+                            species.death = True
+                            location.species_list.remove(species)
+                        else:
+                            num_alive = True    
+        return num_alive
 
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
