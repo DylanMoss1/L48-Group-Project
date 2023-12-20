@@ -9,7 +9,7 @@ from termcolor import colored
 
 class Location:
     """
-    A class representing a location on the simulation grid.
+    A class representing a location on the simulation grid. This location can store multiple Species objects and Food objects. 
 
     Attributes
     ----------
@@ -92,7 +92,8 @@ class World:
         """
 
         self.day += 1
-        self.add_food_to_grid()
+        # probability_of_food stored for logging purposes
+        probability_of_food = self.add_food_to_grid()
         self.species_move()
         self.species_consume_food()
         self.species_reproduce()
@@ -165,18 +166,41 @@ class World:
 
         return probability_of_food
 
-    def species_move(self) -> None: 
-        pass 
-    
-    def species_consume_food(self) -> None: 
-        pass 
-    
-    def species_reproduce(self) -> None: 
-        pass 
-    
-    def species_die(self) -> bool: 
-        pass 
-    
+    def species_move(self) -> None:
+        """
+        All living species make a move on the grid.
+
+        Note that this cannot be in the direction they moved last. 
+        """
+        pass
+
+    def species_consume_food(self) -> None:
+        """
+        If species are in a location with food, they consume all the food to gain energy.
+
+        If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics. 
+        """
+        pass
+
+    def species_reproduce(self) -> None:
+        """
+        If a species has more than N energy, they split into two species with N/2 energy. 
+
+        TODO: Decide a reasonable value for N
+        """
+        pass
+
+    def species_die(self) -> bool:
+        """
+        If any species has less than or equal to 0 energy, they die. 
+
+        Returns
+        -------
+        is_extinct : bool 
+            This is true if all species have died.  
+        """
+        pass
+
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
         Pretty print the World's current state. 

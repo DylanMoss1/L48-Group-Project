@@ -24,6 +24,8 @@ class Species:
         The vision of the species.
     aggression : int
         The aggression of the species.
+    energy : int 
+        Represents how much energy the species has left, if this reaches 0 the species dies. 
     has_moved : bool 
         Records whether the species has moved this timestep. 
     last_moved_direction : optional(int)
@@ -41,5 +43,6 @@ class Species:
         self.speed = 0
         self.vision = 0
         self.aggression = 0
+        self.energy = 5 
         self.has_moved = False
         self.last_moved_directon = None
