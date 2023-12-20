@@ -9,7 +9,7 @@ from termcolor import colored
 
 class Location:
     """
-    A class representing a location on the simulation grid. This location can store multiple Species objects and Food objects. 
+    A class representing a location on the simulation grid. This location can store multiple Species objects and Food objects.
 
     Attributes
     ----------
@@ -81,7 +81,7 @@ class World:
         self.num_initial_species = 50
         self.day = 0
         self.hour = 0
-        self.max_hours = 30 # max hours should ideally be max_speed times speed modifier
+        self.max_hours = 30  # max hours should ideally be max_speed times speed modifier
 
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
@@ -90,7 +90,7 @@ class World:
 
     def compute_timestep(self) -> None:
         """
-        Perform a timestep on the World simulation. 
+        Perform a timestep on the World simulation.
         """
 
         self.day += 1
@@ -121,7 +121,7 @@ class World:
 
     def compute_temperature(self) -> int:
         """
-        Compute the temperature depending on the day. 
+        Compute the temperature depending on the day.
 
         This takes into account both (periodic) seasonal variance and (linear) climate change.
 
@@ -131,7 +131,7 @@ class World:
 
         Returns
         -------
-        temperature : float 
+        temperature : float
             Temperature on the current day
         """
 
@@ -139,17 +139,17 @@ class World:
 
     def add_food_to_grid(self) -> None:
         """
-        Add food to grid depending on current temperature. 
+        Add food to grid depending on current temperature.
 
         We model the probability of a food appearing in a location as a scaled Gaussian distribution:
             probability_of_food = scalar * exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
 
-        TODO: find a scientific backing behind how food availability depends on temperature  
+        TODO: find a scientific backing behind how food availability depends on temperature
 
-        Returns 
+        Returns
         -------
         probability_of_food : float
-            Probability of a food being generated in any location 
+            Probability of a food being generated in any location
         """
 
         optimal_temperature = 10  # TODO: find a better optimal_temperature value
@@ -170,79 +170,92 @@ class World:
         """
         All living species make a move on the grid.
 
-        Note that this cannot be in the direction they moved last. 
+        Note that this cannot be in the direction they moved last.
         """
 
         '''
         TODO: Add vision
         TODO: Add hibernate
         '''
-        speed_modifier = 10 
+        speed_modifier = 10
         '''TODO: Find a better speed modifier
         '''
-        directions = ['N','S','W','E']
+        directions = ['N', 'S', 'W', 'E']
         moved_species = []
 
         for row_index, row in enumerate(self.grid):
-                for col_index, location in enumerate(row):
-                    if (len(location.species_list)>0):
-                        for species in location.species_list:
-                            if self.hour % (species.speed)*speed_modifier == 0 and species.id not in moved_species:
-                                directions_spec = random.sample(directions, len(directions))
-                                if species.last_moved_direction== 'N' or row_index == self.grid_length_size - 1:
-                                    directions_spec.remove('S')
-                                if species.last_moved_direction== 'S' or row_index == 0:
-                                    directions_spec.remove('N')
-                                if species.last_moved_direction== 'W' or col_index == self.grid_length_size - 1:
-                                    directions_spec.remove('E')
-                                if species.last_moved_direction== 'E' or row_index == 0:
-                                    directions_spec.remove('W')
-                                new_direction = directions_spec[0]
-                                species.last_moved_direction = new_direction
-                                if new_direction == 'N':
-                                    self.grid[row_index-1][col_index].add_species(species)
-                                elif new_direction == 'S':
-                                    self.grid[row_index+1][col_index].add_species(species)
-                                elif new_direction == 'W':
-                                    self.grid[row_index][col_index-1].add_species(species)
-                                elif new_direction == 'E':
-                                    self.grid[row_index][col_index+1].add_species(species)  
+            for col_index, location in enumerate(row):
+                if (len(location.species_list) > 0):
+                    for species in location.species_list:
+                        if self.hour % (
+                                species.speed) * speed_modifier == 0 and species.id not in moved_species:
+                            directions_spec = random.sample(
+                                directions, len(directions))
+                            if species.last_moved_direction == 'N' or row_index == self.grid_length_size - 1:
+                                directions_spec.remove('S')
+                            if species.last_moved_direction == 'S' or row_index == 0:
+                                directions_spec.remove('N')
+                            if species.last_moved_direction == 'W' or col_index == self.grid_length_size - 1:
+                                directions_spec.remove('E')
+                            if species.last_moved_direction == 'E' or row_index == 0:
+                                directions_spec.remove('W')
+                            new_direction = directions_spec[0]
+                            species.last_moved_direction = new_direction
+                            if new_direction == 'N':
+                                self.grid[row_index -
+                                          1][col_index].add_species(species)
+                            elif new_direction == 'S':
+                                self.grid[row_index +
+                                          1][col_index].add_species(species)
+                            elif new_direction == 'W':
+                                self.grid[row_index][col_index -
+                                                     1].add_species(species)
+                            elif new_direction == 'E':
+                                self.grid[row_index][col_index +
+                                                     1].add_species(species)
 
-                                self.grid[row_index][col_index].species_list.remove(species)
-                                moved_species.append(species.id)  
+                            self.grid[row_index][col_index].species_list.remove(
+                                species)
+                            moved_species.append(species.id)
         pass
 
     def species_consume_food(self) -> None:
         """
         If species are in a location with food, they consume all the food to gain energy.
 
-        If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics. 
+        If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics.
         """
 
         for row_index, row in enumerate(self.grid):
-                for col_index, location in enumerate(row):
-                    if len(location.species_list)>0 and len(location.food_list)>0:
-                        aggression = [species.aggression for species in location.species_list]
-                        if all(aggr<=1 for aggr in aggression):
-                            for species in location.species_list:
-                                species.energy += len(location.food_list)/len(location.species_list)
+            for col_index, location in enumerate(row):
+                if len(location.species_list) > 0 and len(
+                        location.food_list) > 0:
+                    aggression = [
+                        species.aggression for species in location.species_list]
+                    if all(aggr <= 1 for aggr in aggression):
+                        for species in location.species_list:
+                            species.energy += len(location.food_list) / \
+                                len(location.species_list)
+                    else:
+                        winner_hawk_indices = [
+                            i for i, j in enumerate(aggression)if j == max(aggression)]
+                        if len(winner_hawk_indices) == 1:
+                            max_damage = max(
+                                [i for i in aggression if i < max(aggression)])
+                            if max_damage <= 1:
+                                max_damage = 0
                         else:
-                            winner_hawk_indices = [i for i,j in enumerate(aggression)if j == max(aggression)]
-                            if len(winner_hawk_indices)==1:
-                                max_damage = max([i for i in aggression if i < max(aggression)])
-                                if max_damage<=1:
-                                    max_damage=0
-                            else:
-                                max_damage = max(aggression)    
-                            winner_hawk = location.species_list[random.sample(winner_hawk_indices,1)].id
-                            for species in location.species_list:
-                                if species.aggression>1 :
-                                    if species.id == winner_hawk:
-                                        species.energy+= len(location.food_list)
-                                        species.energy-= max_damage/2
-                                    else:
-                                        species.energy-= species.aggression/2
-                        location.food_list =[]
+                            max_damage = max(aggression)
+                        winner_hawk = location.species_list[random.sample(
+                            winner_hawk_indices, 1)].id
+                        for species in location.species_list:
+                            if species.aggression > 1:
+                                if species.id == winner_hawk:
+                                    species.energy += len(location.food_list)
+                                    species.energy -= max_damage / 2
+                                else:
+                                    species.energy -= species.aggression / 2
+                    location.food_list = []
         pass
 
     def species_move_and_eat(self) -> None:
@@ -252,12 +265,12 @@ class World:
         for hour in range(self.max_hours):
             self.species_move()
             self.species_consume_food()
-            self.hour+=1
+            self.hour += 1
         for row_index, row in enumerate(self.grid):
-                for col_index, location in enumerate(row):
-                    for species in location.species_list:
-                        species.energy-=0.5    
-        pass    
+            for col_index, location in enumerate(row):
+                for species in location.species_list:
+                    species.energy -= 0.5
+        pass
 
     def species_reproduce(self) -> None:
         """
@@ -268,37 +281,37 @@ class World:
         TODO: Add genetic drift
 
         """
-        reproduction_threshold = 6 #placeholder value
+        reproduction_threshold = 6  # placeholder value
         for row_index, row in enumerate(self.grid):
-                for col_index, location in enumerate(row):
-                    for species in location.species_list:
-                        if species.energy>= reproduction_threshold:
-                            location.add_species(Species())     
+            for col_index, location in enumerate(row):
+                for species in location.species_list:
+                    if species.energy >= reproduction_threshold:
+                        location.add_species(Species())
         pass
 
     def species_die(self) -> bool:
         """
-        If any species has less than or equal to 0 energy, they die. 
+        If any species has less than or equal to 0 energy, they die.
 
         Returns
         -------
-        is_extinct : bool 
-            This is true if all species have died.  
+        is_extinct : bool
+            This is true if all species have died.
         """
         num_alive = False
         for row_index, row in enumerate(self.grid):
-                for col_index, location in enumerate(row):
-                    for species in location.species_list:
-                        if species.energy<=0:
-                            species.death = True
-                            location.species_list.remove(species)
-                        else:
-                            num_alive = True    
+            for col_index, location in enumerate(row):
+                for species in location.species_list:
+                    if species.energy <= 0:
+                        species.death = True
+                        location.species_list.remove(species)
+                    else:
+                        num_alive = True
         return num_alive
 
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
-        Pretty print the World's current state. 
+        Pretty print the World's current state.
 
         Parameters
         ----------
@@ -335,7 +348,11 @@ class World:
 
                     pprint_grid[row_index][col_index] = pprint_location
 
-            print(tabulate(pprint_grid, tablefmt='rounded_grid', stralign='center'))
+            print(
+                tabulate(
+                    pprint_grid,
+                    tablefmt='rounded_grid',
+                    stralign='center'))
             print("\n")
 
         # Pretty print all traits of living species in a table
