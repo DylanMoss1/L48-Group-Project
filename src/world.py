@@ -80,6 +80,8 @@ class World:
         self.grid_length_size = 20
         self.num_initial_species = 50
         self.day = 0
+        self.hour = 0
+        self.max_hours = 30 # max hours should ideally be max_speed times speed modifier
 
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
@@ -98,7 +100,7 @@ class World:
         self.species_consume_food()
         self.species_reproduce()
         is_extinct = self.species_die()
-
+        self.hour = 0
         return is_extinct
 
     def populate_grid(self) -> None:
@@ -172,6 +174,43 @@ class World:
 
         Note that this cannot be in the direction they moved last. 
         """
+
+        '''TODO: Add vision
+        '''
+        speed_modifier = 10 
+        '''TODO: Find a better speed modifier
+        '''
+        directions = ['N','S','W','E']
+        moved_species = []
+
+        for row_index, row in enumerate(self.grid):
+                for col_index, location in enumerate(row):
+                    if (len(location.species_list)>0):
+                        for species in location.species_list:
+                            if self.hour % (species.speed)*speed_modifier == 0 and species.id not in moved_species:
+                                directions_spec = random.sample(directions, len(directions))
+                                if species.last_moved_direction== 'N' or row_index == self.grid_length_size - 1:
+                                    directions_spec.remove('S')
+                                if species.last_moved_direction== 'S' or row_index == 0:
+                                    directions_spec.remove('N')
+                                if species.last_moved_direction== 'W' or col_index == self.grid_length_size - 1:
+                                    directions_spec.remove('E')
+                                if species.last_moved_direction== 'E' or row_index == 0:
+                                    directions_spec.remove('W')
+                                new_direction = directions_spec[0]
+                                species.last_moved_direction = new_direction
+                                if new_direction == 'N':
+                                    self.grid[row_index-1][col_index].add_species(species)
+                                elif new_direction == 'S':
+                                    self.grid[row_index+1][col_index].add_species(species)
+                                elif new_direction == 'W':
+                                    self.grid[row_index][col_index-1].add_species(species)
+                                elif new_direction == 'E':
+                                    self.grid[row_index][col_index+1].add_species(species)  
+
+                                self.grid[row_index][col_index].species_list.remove(species)
+                                moved_species.append(species.id)  
+        self.hour+=1
         pass
 
     def species_consume_food(self) -> None:
@@ -180,6 +219,11 @@ class World:
 
         If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics. 
         """
+
+        '''for row_index, row in enumerate(self.grid):
+                for col_index, location in enumerate(row):
+                    if len(location.species_list)>0 and len(location.food_list):
+                        i ='''
         pass
 
     def species_reproduce(self) -> None:
