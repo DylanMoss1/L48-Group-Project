@@ -15,7 +15,7 @@ OPTIMAL_TEMPERATURE: 10
 # @Atreyi: to explain 
 SPEED_MODIFIER: 10
 
-# Initial energy of a species during *initial* population (not during reproduction) (@Atreyi to check)
+# Initial energy of a species during *initial* population (not during reproduction)
 INITIAL_ENERGY: 5
 
 # Initial trait values 
@@ -25,4 +25,7 @@ INITIAL_VISION: 1
 INITIAL_AGGRESSION: 1
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
-FOOD_VALUE: 1 
+FOOD_VALUE: 1
+
+# The amount of enery required to reproduce 
+REPRODUCTION_THRESHOLD: 6

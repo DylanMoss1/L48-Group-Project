@@ -333,7 +333,7 @@ class World:
         TODO: Add genetic drift
 
         """
-        reproduction_threshold = 6  # placeholder value
+        reproduction_threshold = constants.REPRODUCTION_THRESHOLD
         for row_index, row in enumerate(self.grid):
             for col_index, location in enumerate(row):
                 for species in location.species_list:
