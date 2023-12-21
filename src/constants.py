@@ -17,6 +17,7 @@ OPTIMAL_TEMPERATURE = simulation_constants["OPTIMAL_TEMPERATURE"]
 SPEED_MODIFIER = simulation_constants["SPEED_MODIFIER"]
 
 INITIAL_ENERGY = simulation_constants["INITIAL_ENERGY"]
+ENERGY_LOSS = simulation_constants["ENERGY_LOSS"]
 
 INITIAL_SIZE = simulation_constants["INITIAL_SIZE"]
 INITIAL_SPEED = simulation_constants["INITIAL_SPEED"]

@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Any
+from typing import Dict, Any, List
 from species import Species
 from food import Food
 import math
@@ -7,6 +7,7 @@ from pprint import pprint
 from tabulate import tabulate
 from termcolor import colored
 import constants
+from dataclasses import dataclass
 
 
 class Location:
@@ -58,6 +59,11 @@ class Location:
         return [str(food.value) for food in self.food_list]
 
 
+@dataclass
+class LogItem:
+    num_species_alive: int
+
+
 class World:
     """
     A class representing the simulation world.
@@ -73,6 +79,8 @@ class World:
         Length of each size of the simulation grid.
     num_inital_species : constant(int)
         Number of inital species placed onto the grid
+    num_actions_per_day : constant(int)
+        Number of moving and feeding actions made per day
     days : int
         Days elapsed since the start of the simulation (starts at 0)
     grid : list(list(Location))
@@ -88,17 +96,16 @@ class World:
 
         self.num_initial_species = constants.NUM_INITIAL_SPECIES_FRACTION * \
             (grid_length_size ** 2)
+
         self.day = 0
-        self.hour = 0
-        # max hours should ideally be max_speed times speed modifier
-        self.max_hours = constants.NUM_ACTIONS_PER_DAY
+        self.num_actions_per_day = constants.NUM_ACTIONS_PER_DAY
 
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
         ]
         self.populate_grid()
 
-    def run(self, mutation_rates) -> Dict[str, Any]:
+    def run(self, mutation_rates) -> List[LogItem]:
         """
         Run the World simulation with given mutation rates until the species goes extinct. 
 
@@ -110,8 +117,10 @@ class World:
 
         Returns 
         -------
-        log : dict(string, any)
-            Contains entries TODO 
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training) made throughout the simulation's execution
 
         Attributes 
         ----------
@@ -130,27 +139,47 @@ class World:
         self.vision_mutation_rate = mutation_rates["vision"]
         self.aggression_mutation_rate = mutation_rates["aggression"]
 
+        self.day = 0
+        log = []
         is_extinct = False
 
         while not is_extinct:
-            is_extinct, log = self.compute_timestep()
+            self.day += 1
+            is_extinct, log_item = self.compute_timestep()
+            log.append(log_item)
+            print(log)
 
-        return log
+        days_survived = self.day
+
+        return days_survived, log
 
     def compute_timestep(self) -> None:
         """
-        Perform a timestep (that is process 1 day) in the World simulation.
+        Perform a timestep (that is process 1 day) of the World simulation.
+
+        Returns 
+        -------
+        is_extinct : bool 
+            This is true if, and only if, all species have died
+        log_item : LogItem
+            The log item entry for this timestep of the simulation (important values for emulation training)
         """
 
-        log = {}
         self.day += 1
-        # probability_of_food stored for logging purposes
-        probability_of_food = self.add_food_to_grid()
-        self.species_move_and_eat()
-        self.species_reproduce()
-        is_extinct = self.species_die()
-        self.hour = 0
-        return is_extinct, log
+
+        self.add_food_to_grid()
+
+        for action_number in range(self.num_actions_per_day):
+            self.species_move(action_number)
+            self.species_consume_food()
+
+        self.species_lose_energy()
+        num_species_alive = self.species_die()
+
+        log_item = LogItem(num_species_alive)
+        is_extinct = num_species_alive == 0
+
+        return is_extinct, log_item
 
     def populate_grid(self) -> None:
         """
@@ -218,11 +247,16 @@ class World:
 
         return probability_of_food
 
-    def species_move(self) -> None:
+    def species_move(self, action_number) -> None:
         """
         All living species make a move on the grid.
 
         Note that this cannot be in the direction they moved last.
+
+        Parameters
+        ----------
+        action_number : int 
+            The number of actions that have already happened this day  
         """
 
         '''
@@ -239,7 +273,7 @@ class World:
             for col_index, location in enumerate(row):
                 if (len(location.species_list) > 0):
                     for species in location.species_list:
-                        if self.hour % (
+                        if action_number % (
                                 species.speed) * speed_modifier == 0 and species.id not in moved_species:
                             directions_spec = random.sample(
                                 directions, len(directions))
@@ -276,10 +310,12 @@ class World:
         If species are in a location with food, they consume all the food to gain energy.
 
         If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics.
+
+        TODO: Add speed related energy waste
         """
 
-        for row_index, row in enumerate(self.grid):
-            for col_index, location in enumerate(row):
+        for row in self.grid:
+            for location in row:
                 if len(location.species_list) > 0 and len(
                         location.food_list) > 0:
                     aggression = [
@@ -308,21 +344,18 @@ class World:
                                 else:
                                     species.energy -= species.aggression / 2
                     location.food_list = []
-        pass
 
-    def species_move_and_eat(self) -> None:
-        '''
-        TODO: Add speed related energy waste
-        '''
-        for hour in range(self.max_hours):
-            self.species_move()
-            self.species_consume_food()
-            self.hour += 1
-        for row_index, row in enumerate(self.grid):
-            for col_index, location in enumerate(row):
+    def species_lose_energy(self) -> None:
+        """
+        Each species loses a set amount of energy at the end of every day. 
+        """
+
+        energy_loss = constants.ENERGY_LOSS
+
+        for row in self.grid:
+            for location in row:
                 for species in location.species_list:
-                    species.energy -= 0.5
-        pass
+                    species.energy -= energy_loss
 
     def species_reproduce(self) -> None:
         """
@@ -331,15 +364,15 @@ class World:
         TODO: Decide a reasonable value for N
 
         TODO: Add genetic drift
-
         """
+
         reproduction_threshold = constants.REPRODUCTION_THRESHOLD
-        for row_index, row in enumerate(self.grid):
-            for col_index, location in enumerate(row):
+
+        for row in self.grid:
+            for location in row:
                 for species in location.species_list:
                     if species.energy >= reproduction_threshold:
                         location.add_species(Species())
-        pass
 
     def species_die(self) -> bool:
         """
@@ -347,11 +380,11 @@ class World:
 
         Returns
         -------
-        is_extinct : bool
-            This is true if all species have died.
+        num_species_alive : int
+            The number of species that are still alive in the simulation World
         """
 
-        is_extinct = True
+        num_alive_species = 0  # Calculated like this for the logs
 
         for row in self.grid:
             for location in row:
@@ -360,9 +393,9 @@ class World:
                         species.death = True
                         location.species_list.remove(species)
                     else:
-                        is_extinct = False
+                        num_alive_species += 1
 
-        return is_extinct
+        return num_alive_species
 
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """

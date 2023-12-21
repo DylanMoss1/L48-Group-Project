@@ -1,6 +1,7 @@
 from simulator import MainSimulator
 
-if __name__ == "__main__":
+
+if __name__ == "__main__": 
 
     main_simulator = MainSimulator()
 
