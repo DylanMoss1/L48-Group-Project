@@ -1,3 +1,5 @@
+import constants
+
 species_id = 0
 
 
@@ -39,11 +41,11 @@ class Species:
         """
 
         self.id = get_new_species_id()
-        self.size = 1
-        self.speed = 1
-        self.vision = 1
-        self.aggression = 1
-        self.energy = 5 
+        self.size = constants.INITIAL_SIZE
+        self.speed = constants.INITIAL_SPEED
+        self.vision = constants.INITIAL_VISION
+        self.aggression = constants.INITIAL_AGGRESSION
+        self.energy = constants.INITIAL_ENERGY
         self.has_moved = False
         self.death = False
         self.last_moved_direction = None

@@ -1,3 +1,6 @@
+import constants
+
+
 class Food:
     """
     A class representing food on the simulation grid.
@@ -12,5 +15,5 @@ class Food:
         """
         Initialise a Food object.
         """
-        
-        self.value = 1
+
+        self.value = constants.FOOD_VALUE

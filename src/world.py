@@ -6,7 +6,8 @@ import math
 from pprint import pprint
 from tabulate import tabulate
 from termcolor import colored
-import constants as constants
+import constants
+
 
 class Location:
     """
@@ -85,10 +86,12 @@ class World:
 
         self.grid_length_size = grid_length_size
 
-        self.num_initial_species = constants.NUM_INITIAL_SPECIES
+        self.num_initial_species = constants.NUM_INITIAL_SPECIES_FRACTION * \
+            (grid_length_size ** 2)
         self.day = 0
         self.hour = 0
-        self.max_hours = 30  # max hours should ideally be max_speed times speed modifier
+        # max hours should ideally be max_speed times speed modifier
+        self.max_hours = constants.NUM_ACTIONS_PER_DAY
 
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
@@ -147,7 +150,7 @@ class World:
         self.species_reproduce()
         is_extinct = self.species_die()
         self.hour = 0
-        return is_extinct, log 
+        return is_extinct, log
 
     def populate_grid(self) -> None:
         """
@@ -199,13 +202,15 @@ class World:
             Probability of a food being generated in any location
         """
 
-        optimal_temperature = 10  # TODO: find a better optimal_temperature value
-        scalar = 0.1
-        sigma = 10
+        optimal_temperature = constants.OPTIMAL_TEMPERATURE
+        scalar = constants.FOOD_PROBABILITY_SCALAR
+        sigma = constants.FOOD_PROBABILITY_STD
 
         temperature = self.compute_temperature()
+
         probability_of_food = scalar * \
             math.exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
+
         for row in self.grid:
             for location in row:
                 if random.random() < probability_of_food:
@@ -224,7 +229,7 @@ class World:
         TODO: Add vision
         TODO: Add hibernate
         '''
-        speed_modifier = 10
+        speed_modifier = constants.SPEED_MODIFIER
         '''TODO: Find a better speed modifier
         '''
         directions = ['N', 'S', 'W', 'E']
