@@ -298,16 +298,19 @@ class World:
         is_extinct : bool
             This is true if all species have died.
         """
-        num_alive = False
-        for row_index, row in enumerate(self.grid):
-            for col_index, location in enumerate(row):
+
+        is_extinct = True 
+
+        for row in self.grid:
+            for location in row:
                 for species in location.species_list:
                     if species.energy <= 0:
                         species.death = True
                         location.species_list.remove(species)
                     else:
-                        num_alive = True
-        return num_alive
+                        is_extinct = False 
+
+        return is_extinct
 
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
