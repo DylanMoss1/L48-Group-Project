@@ -1,11 +1,12 @@
 import random
+from typing import Dict, Any
 from species import Species
 from food import Food
 import math
 from pprint import pprint
 from tabulate import tabulate
 from termcolor import colored
-
+import constants as constants
 
 class Location:
     """
@@ -60,9 +61,14 @@ class World:
     """
     A class representing the simulation world.
 
+    Parameters
+    ----------
+    grid_length_size : int 
+        Length of each size of the simulation grid.
+
     Attributes
     ----------
-    grid_length_size : constant(int)
+    grid_length_size : int
         Length of each size of the simulation grid.
     num_inital_species : constant(int)
         Number of inital species placed onto the grid
@@ -72,13 +78,14 @@ class World:
         Stores the current state of the world. A grid_size x grid_size matrix of Location instances
     """
 
-    def __init__(self) -> None:
+    def __init__(self, grid_length_size) -> None:
         """
         Initialise the World object.
         """
 
-        self.grid_length_size = 20
-        self.num_initial_species = 50
+        self.grid_length_size = grid_length_size
+
+        self.num_initial_species = constants.NUM_INITIAL_SPECIES
         self.day = 0
         self.hour = 0
         self.max_hours = 30  # max hours should ideally be max_speed times speed modifier
@@ -88,11 +95,51 @@ class World:
         ]
         self.populate_grid()
 
-    def compute_timestep(self) -> None:
+    def run(self, mutation_rates) -> Dict[str, Any]:
         """
-        Perform a timestep on the World simulation.
+        Run the World simulation with given mutation rates until the species goes extinct. 
+
+        Parameters
+        ----------
+        mutation_rates : dict(string, int)
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values representing the mutation rates for each trait. 
+
+        Returns 
+        -------
+        log : dict(string, any)
+            Contains entries TODO 
+
+        Attributes 
+        ----------
+        size_mutation_rate : int 
+            Mutation rate for species size: size_{t+1} = N(size_t, size_mutation_rate)
+        speed_mutation_rate : int 
+            Mutation rate for species speed: speed_{t+1} = N(speed_t, speed_mutation_rate)
+        vision_mutation_rate : int 
+            Mutation rate for species vision: vision_{t+1} = N(vision_t, vision_mutation_rate)
+        aggression_mutation_rate : int 
+            Mutation rate for species aggression: aggression_{t+1} = N(aggression_t, aggression_mutation_rate)
         """
 
+        self.size_mutation_rate = mutation_rates["size"]
+        self.speed_mutation_rate = mutation_rates["speed"]
+        self.vision_mutation_rate = mutation_rates["vision"]
+        self.aggression_mutation_rate = mutation_rates["aggression"]
+
+        is_extinct = False
+
+        while not is_extinct:
+            is_extinct, log = self.compute_timestep()
+
+        return log
+
+    def compute_timestep(self) -> None:
+        """
+        Perform a timestep (that is process 1 day) in the World simulation.
+        """
+
+        log = {}
         self.day += 1
         # probability_of_food stored for logging purposes
         probability_of_food = self.add_food_to_grid()
@@ -100,7 +147,7 @@ class World:
         self.species_reproduce()
         is_extinct = self.species_die()
         self.hour = 0
-        return is_extinct
+        return is_extinct, log 
 
     def populate_grid(self) -> None:
         """
@@ -299,7 +346,7 @@ class World:
             This is true if all species have died.
         """
 
-        is_extinct = True 
+        is_extinct = True
 
         for row in self.grid:
             for location in row:
@@ -308,7 +355,7 @@ class World:
                         species.death = True
                         location.species_list.remove(species)
                     else:
-                        is_extinct = False 
+                        is_extinct = False
 
         return is_extinct
 
