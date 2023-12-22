@@ -1,4 +1,4 @@
-from world import LogItem, World
+from world import LogItem, World, DebugInfo
 from typing import Dict, Any, List
 from abc import ABC
 
@@ -19,7 +19,7 @@ class Simulator(ABC):
         """
         self.world = World(grid_length_size)
 
-    def run(self, mutation_rates) -> List[LogItem]:
+    def run(self, mutation_rates, debug_info=DebugInfo()) -> (int, List[LogItem]):
         """
         Run the simulation with given mutation rates until the species goes extinct.
 
@@ -27,16 +27,18 @@ class Simulator(ABC):
         ----------
         mutation_rates : dict(string, int)
             Contains keys: size, speed, vision, aggression. 
-            With corresponding values representing the mutation rates for each trait. 
+            With corresponding values representing the mutation rates for each trait
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
 
         Returns
         -------
         days_survived : int 
             The number of days the species has survived until extinction 
         log : list(LogItem)
-            A list of log item entries (important values for emulation training) made throughout the simulation's execution
+            A list of log item entries (important values for emulation training: see world.LogItem) made throughout the simulation's execution
         """
-        days_survived, log = self.world.run(mutation_rates)
+        days_survived, log = self.world.run(mutation_rates, debug_info)
         return days_survived, log
 
 

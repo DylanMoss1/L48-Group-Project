@@ -28,8 +28,6 @@ class Species:
         The aggression of the species.
     energy : int 
         Represents how much energy the species has left, if this reaches 0 the species dies. 
-    has_moved : bool 
-        Records whether the species has moved this timestep. 
     last_moved_direction : optional(int)
         Stores the direction the species last moved in.
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
@@ -46,6 +44,5 @@ class Species:
         self.vision = constants.INITIAL_VISION
         self.aggression = constants.INITIAL_AGGRESSION
         self.energy = constants.INITIAL_ENERGY
-        self.has_moved = False
         self.death = False
         self.last_moved_direction = None

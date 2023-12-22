@@ -60,7 +60,35 @@ class Location:
 
 
 @dataclass
+class DebugInfo:
+    """
+    A class containing information about how much information should be printed to the console during the program's execution.
+    The default is no debug info. 
+
+    Attributes 
+    ----------
+    period : int 
+        The number of days to wait before printing debug info (default is 1)
+    should_display_grid : bool 
+        Should the grid state be printed in the debug info (default is False) 
+    should_display_traits : bool
+        Should the traits of each species be printed in the debug info (default is False) 
+    """
+    period: int = 1
+    should_display_grid: bool = False
+    should_display_traits: bool = False
+
+
+@dataclass
 class LogItem:
+    """
+    Contains a log entries for each day of the simulation, for analysis and training emulators. 
+
+    Attributes 
+    ----------
+    num_species_alive : int 
+        The number of species that still live at the *start* of this timestep 
+    """
     num_species_alive: int
 
 
@@ -105,7 +133,7 @@ class World:
         ]
         self.populate_grid()
 
-    def run(self, mutation_rates) -> List[LogItem]:
+    def run(self, mutation_rates, debug_info=DebugInfo()) -> (int, List[LogItem]):
         """
         Run the World simulation with given mutation rates until the species goes extinct. 
 
@@ -113,14 +141,16 @@ class World:
         ----------
         mutation_rates : dict(string, int)
             Contains keys: size, speed, vision, aggression. 
-            With corresponding values representing the mutation rates for each trait. 
+            With corresponding values representing the mutation rates for each trait 
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
 
         Returns 
         -------
         days_survived : int 
             The number of days the species has survived until extinction 
         log : list(LogItem)
-            A list of log item entries (important values for emulation training) made throughout the simulation's execution
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
 
         Attributes 
         ----------
@@ -147,11 +177,24 @@ class World:
             self.day += 1
             is_extinct, log_item = self.compute_timestep()
             log.append(log_item)
-            print(log)
+            self.debug(debug_info)
 
         days_survived = self.day
 
         return days_survived, log
+
+    def debug(self, debug_info) -> None:
+        """
+        If the current day reaches the debug_info period, pretty print the World's state according to the remaining debug_info parameters: should_display_grid and should_display_traits
+
+        Parameters
+        ----------
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        """
+        if self.day % debug_info.period == 0:
+            self.pprint(debug_info.should_display_grid,
+                        debug_info.should_display_traits)
 
     def compute_timestep(self) -> None:
         """
@@ -162,7 +205,7 @@ class World:
         is_extinct : bool 
             This is true if, and only if, all species have died
         log_item : LogItem
-            The log item entry for this timestep of the simulation (important values for emulation training)
+            The log item entry for this timestep of the simulation (important values for emulation training: see LogItem)
         """
 
         self.day += 1
@@ -247,6 +290,9 @@ class World:
 
         return probability_of_food
 
+    def add_species_to_grid(self, species, row_index, col_index):
+        self.grid[row_index][col_index].add_species(species)
+
     def species_move(self, action_number) -> None:
         """
         All living species make a move on the grid.
@@ -264,46 +310,50 @@ class World:
         TODO: Add hibernate
         '''
         speed_modifier = constants.SPEED_MODIFIER
-        '''TODO: Find a better speed modifier
-        '''
         directions = ['N', 'S', 'W', 'E']
         moved_species = []
 
         for row_index, row in enumerate(self.grid):
             for col_index, location in enumerate(row):
-                if (len(location.species_list) > 0):
-                    for species in location.species_list:
-                        if action_number % (
-                                species.speed) * speed_modifier == 0 and species.id not in moved_species:
-                            directions_spec = random.sample(
-                                directions, len(directions))
-                            if species.last_moved_direction == 'N' or row_index == self.grid_length_size - 1:
-                                directions_spec.remove('S')
-                            if species.last_moved_direction == 'S' or row_index == 0:
-                                directions_spec.remove('N')
-                            if species.last_moved_direction == 'W' or col_index == self.grid_length_size - 1:
-                                directions_spec.remove('E')
-                            if species.last_moved_direction == 'E' or row_index == 0:
-                                directions_spec.remove('W')
-                            new_direction = directions_spec[0]
-                            species.last_moved_direction = new_direction
-                            if new_direction == 'N':
-                                self.grid[row_index -
-                                          1][col_index].add_species(species)
-                            elif new_direction == 'S':
-                                self.grid[row_index +
-                                          1][col_index].add_species(species)
-                            elif new_direction == 'W':
-                                self.grid[row_index][col_index -
-                                                     1].add_species(species)
-                            elif new_direction == 'E':
-                                self.grid[row_index][col_index +
-                                                     1].add_species(species)
+                for species in location.species_list:
 
-                            self.grid[row_index][col_index].species_list.remove(
-                                species)
-                            moved_species.append(species.id)
-        pass
+                    able_to_move = action_number % (
+                        species.speed) * speed_modifier == 0
+                    has_previously_moved = species.id in moved_species
+
+                    if able_to_move and not has_previously_moved:
+
+                        directions_spec = random.sample(
+                            directions, len(directions))
+
+                        if species.last_moved_direction == 'N' or row_index == self.grid_length_size - 1:
+                            directions_spec.remove('S')
+                        if species.last_moved_direction == 'S' or row_index == 0:
+                            directions_spec.remove('N')
+                        if species.last_moved_direction == 'E' or col_index == self.grid_length_size - 1:
+                            directions_spec.remove('E')
+                        if species.last_moved_direction == 'W' or col_index == 0:
+                            directions_spec.remove('W')
+
+                        new_direction = directions_spec[0]
+                        species.last_moved_direction = new_direction
+
+                        match new_direction:
+                            case 'N':
+                                self.add_species_to_grid(
+                                    species, row_index - 1, col_index)
+                            case 'S':
+                                self.add_species_to_grid(
+                                    species, row_index + 1, col_index)
+                            case 'W':
+                                self.add_species_to_grid(
+                                    species, row_index, col_index - 1)
+                            case 'E':
+                                self.add_species_to_grid(
+                                    species, row_index, col_index + 1)
+
+                        location.species_list.remove(species)
+                        moved_species.append(species.id)
 
     def species_consume_food(self) -> None:
         """
@@ -360,8 +410,6 @@ class World:
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
-
-        TODO: Decide a reasonable value for N
 
         TODO: Add genetic drift
         """
@@ -451,12 +499,12 @@ class World:
                 for location in row:
                     for species in location.species_list:
                         species_traits_list.append(
-                            [species.id, species.size, species.speed, species.vision, species.aggression])
+                            [species.id, species.size, species.speed, species.vision, species.aggression, species.energy])
 
             species_traits_list.sort(
                 key=lambda species_traits: species_traits[0])
 
             table = [['Species ID', 'Size', 'Speed',
-                      'Vision', 'Aggression']] + species_traits_list
+                      'Vision', 'Aggression', 'Energy']] + species_traits_list
 
             print(tabulate(table, headers='firstrow', tablefmt='fancygrid'))
