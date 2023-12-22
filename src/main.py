@@ -1,5 +1,6 @@
 from simulator import MainSimulator, TinySimulator
 from world import DebugInfo
+from pprint import pprint
 
 
 if __name__ == "__main__":
@@ -14,8 +15,9 @@ if __name__ == "__main__":
     }
 
     days_survived, log = tiny_simulator.run(mutation_rates, debug_info=DebugInfo(
-        period=1, should_display_grid=True, should_display_traits=True))
+        period=1, should_display_grid=True, should_display_traits=True), max_days=10)
 
-    # main_simulator = MainSimulator()
+    # days_survived, log = tiny_simulator.run(mutation_rates, max_days=10)
 
-    # days_survived, log = main_simulator.run(mutation_rates)
+    print(days_survived)
+    pprint(log)

@@ -86,10 +86,28 @@ class LogItem:
 
     Attributes 
     ----------
+    day : int 
+        The current day of the simulation 
     num_species_alive : int 
-        The number of species that still live at the *start* of this timestep 
+        The number of species that still live at the *start* of this day
+    temperature : float 
+        Current temperature on this day  
+    probability_of_food : float
+        Probability of a food being generated in any location on this day 
+    traits_dict : Dict[str, List[float]]
+        Contains traits of all living species at the *start* of this day in the form: 
+        {
+          "size" : [size_species_1, ..., size_species_n],
+          "speed" : [speed_species_1, ..., speed_species_n],
+          "vision" : [vision_species_1, ..., vision_species_n],
+          "aggression" : [aggression_species_1, ..., aggression_species_n],
+        }
     """
+    day: int
     num_species_alive: int
+    temperature: float
+    probability_of_food: float
+    traits_dict: Dict[str, List[float]]
 
 
 class World:
@@ -133,7 +151,7 @@ class World:
         ]
         self.populate_grid()
 
-    def run(self, mutation_rates, debug_info=DebugInfo()) -> (int, List[LogItem]):
+    def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
         """
         Run the World simulation with given mutation rates until the species goes extinct. 
 
@@ -144,6 +162,8 @@ class World:
             With corresponding values representing the mutation rates for each trait 
         debug_info : DebugInfo 
             Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
 
         Returns 
         -------
@@ -175,6 +195,11 @@ class World:
 
         while not is_extinct:
             self.day += 1
+
+            if max_days:
+                if self.day > max_days:
+                    break
+
             is_extinct, log_item = self.compute_timestep()
             log.append(log_item)
             self.debug(debug_info)
@@ -210,7 +235,8 @@ class World:
 
         self.day += 1
 
-        self.add_food_to_grid()
+        traits_dict = self.get_traits_of_living_species()
+        temperature, probability_of_food = self.add_food_to_grid()
 
         for action_number in range(self.num_actions_per_day):
             self.species_move(action_number)
@@ -219,7 +245,9 @@ class World:
         self.species_lose_energy()
         num_species_alive = self.species_die()
 
-        log_item = LogItem(num_species_alive)
+        log_item = LogItem(self.day, num_species_alive,
+                           temperature, probability_of_food, traits_dict)
+
         is_extinct = num_species_alive == 0
 
         return is_extinct, log_item
@@ -240,6 +268,34 @@ class World:
         for species_x, species_y in species_location_set:
             # Add new species instances at every location in the set
             self.grid[species_y][species_x].add_species(Species())
+
+    def get_traits_of_living_species(self) -> Dict[str, List[float]]:
+        """
+        Returns each trait of all living species in list form, accessible through a dictionary. 
+
+        Returns
+        -------
+        traits_dict : Dict[str, List[float]]
+            Contains traits of all living species in the form: 
+            {
+              "size" : [size_species_1, ..., size_species_n],
+              "speed" : [speed_species_1, ..., speed_species_n],
+              "vision" : [vision_species_1, ..., vision_species_n],
+              "aggression" : [aggression_species_1, ..., aggression_species_n],
+            }
+        """
+
+        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": []}
+
+        for row in self.grid:
+            for location in row:
+                for species in location.species_list:
+                    traits_dict["size"].append(species.size)
+                    traits_dict["speed"].append(species.speed)
+                    traits_dict["vision"].append(species.vision)
+                    traits_dict["aggression"].append(species.aggression)
+
+        return traits_dict
 
     def compute_temperature(self) -> int:
         """
@@ -270,8 +326,10 @@ class World:
 
         Returns
         -------
+        temperature : float 
+            Current temperature on this day  
         probability_of_food : float
-            Probability of a food being generated in any location
+            Probability of a food being generated in any location on this day 
         """
 
         optimal_temperature = constants.OPTIMAL_TEMPERATURE
@@ -288,7 +346,7 @@ class World:
                 if random.random() < probability_of_food:
                     location.add_food()
 
-        return probability_of_food
+        return temperature, probability_of_food
 
     def add_species_to_grid(self, species, row_index, col_index):
         self.grid[row_index][col_index].add_species(species)
@@ -360,6 +418,7 @@ class World:
         If species are in a location with food, they consume all the food to gain energy.
 
         If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics.
+        @Atreyi to explain in more detail  
 
         TODO: Add speed related energy waste
         """

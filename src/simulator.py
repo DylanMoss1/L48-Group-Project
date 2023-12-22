@@ -19,7 +19,7 @@ class Simulator(ABC):
         """
         self.world = World(grid_length_size)
 
-    def run(self, mutation_rates, debug_info=DebugInfo()) -> (int, List[LogItem]):
+    def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
         """
         Run the simulation with given mutation rates until the species goes extinct.
 
@@ -30,6 +30,8 @@ class Simulator(ABC):
             With corresponding values representing the mutation rates for each trait
         debug_info : DebugInfo 
             Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
 
         Returns
         -------
@@ -38,7 +40,9 @@ class Simulator(ABC):
         log : list(LogItem)
             A list of log item entries (important values for emulation training: see world.LogItem) made throughout the simulation's execution
         """
-        days_survived, log = self.world.run(mutation_rates, debug_info)
+        days_survived, log = self.world.run(
+            mutation_rates, debug_info, max_days)
+
         return days_survived, log
 
 

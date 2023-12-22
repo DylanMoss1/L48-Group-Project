@@ -18,17 +18,17 @@ class Species:
     ----------
     id : int
         Unique identifier for the species.
-    size : int
+    size : float
         The size of the species.
-    speed : int
+    speed : float
         The speed of the species.
-    vision : int
+    vision : float
         The vision of the species.
-    aggression : int
+    aggression : float
         The aggression of the species.
-    energy : int 
+    energy : float 
         Represents how much energy the species has left, if this reaches 0 the species dies. 
-    last_moved_direction : optional(int)
+    last_moved_direction : optional(int)  @Atreyi to update 
         Stores the direction the species last moved in.
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
     """
