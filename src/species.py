@@ -1,4 +1,8 @@
+from typing import Dict
 import constants
+import random
+
+# Generate unique species IDs
 
 species_id = 0
 
@@ -8,6 +12,14 @@ def get_new_species_id() -> int:
     global species_id
     species_id += 1
     return species_id - 1
+
+# Collect relevant constants
+
+
+initial_size = constants.INITIAL_SIZE
+initial_speed = constants.INITIAL_SPEED
+initial_vision = constants.INITIAL_VISION
+initial_aggression = constants.INITIAL_AGGRESSION
 
 
 class Species:
@@ -33,16 +45,59 @@ class Species:
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, size=initial_size, speed=initial_speed, vision=initial_vision, aggression=initial_aggression) -> None:
         """
         Initialise a Species object.
         """
 
         self.id = get_new_species_id()
-        self.size = constants.INITIAL_SIZE
-        self.speed = constants.INITIAL_SPEED
-        self.vision = constants.INITIAL_VISION
-        self.aggression = constants.INITIAL_AGGRESSION
+        self.size = size
+        self.speed = speed
+        self.vision = vision
+        self.aggression = aggression
         self.energy = constants.INITIAL_ENERGY
         self.death = False
         self.last_moved_direction = None
+
+    def get_traits(self) -> Dict[str, float]:
+        """
+        Get the species' traits in dictionary form.
+
+        Returns
+        -------
+        traits : dict(str, float) 
+            Traits in dictionary form (with keys "size", "speed", "vision", "aggression") 
+        """
+        return {
+            "size": self.size,
+            "speed": self.speed,
+            "vision": self.vision,
+            "aggression": self.aggression,
+        }
+
+    @staticmethod
+    def get_child_traits(original_traits, mutation_rates) -> Dict[str, float]:
+        """
+        Add mutation to original_traits with mutation_rates to obtain the child trait values. 
+
+        Parameters
+        ----------
+        original_traits : dict(str, float) 
+            Parent traits in dictionary form (with keys "size", "speed", "vision", "aggression") 
+        mutation_rates : dict(str, float)
+            Global mutation rate values in dictionary form (with keys "size", "speed", "vision", "aggression") 
+
+        Returns 
+        -------
+        new_traits : dict(str, float) 
+            Child traits (parent traits + mutations) in dictionary form (with keys "size", "speed", "vision", "aggression")
+        """
+
+        new_traits = {"size": None, "speed": None,
+                      "vision": None, "aggression": None}
+
+        for key, value in original_traits.items():
+            new_traits[key] = random.normal(
+                loc=value, scale=mutation_rates[key])
+
+        return new_traits

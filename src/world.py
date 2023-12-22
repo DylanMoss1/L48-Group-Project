@@ -188,6 +188,12 @@ class World:
         self.speed_mutation_rate = mutation_rates["speed"]
         self.vision_mutation_rate = mutation_rates["vision"]
         self.aggression_mutation_rate = mutation_rates["aggression"]
+        self.mutation_rates = {
+            "size": mutation_rates["size"],
+            "speed": mutation_rates["speed"],
+            "vision": mutation_rates["vision"],
+            "aggression": mutation_rates["aggression"]
+        }
 
         self.day = 0
         log = []
@@ -198,6 +204,7 @@ class World:
 
             if max_days:
                 if self.day > max_days:
+                    self.day -= 1
                     break
 
             is_extinct, log_item = self.compute_timestep()
@@ -469,8 +476,6 @@ class World:
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
-
-        TODO: Add genetic drift
         """
 
         reproduction_threshold = constants.REPRODUCTION_THRESHOLD
@@ -479,7 +484,17 @@ class World:
             for location in row:
                 for species in location.species_list:
                     if species.energy >= reproduction_threshold:
-                        location.add_species(Species())
+
+                        # Get parent's traits
+                        parent_traits = species.get_traits()
+
+                        # Add random mutation to generate child's trait values
+                        child_traits = Species.get_child_traits(
+                            parent_traits, self.mutation_rates)
+
+                        # Generate a child from these trait values
+                        location.add_species(Species(
+                            size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))
 
     def species_die(self) -> bool:
         """
@@ -512,13 +527,13 @@ class World:
         ----------
         display_grid : bool
             If true, pretty print self.grid (default is True).
-            Each location is represented as s1,...,sn||f1,...,fn for species ids s1,...,sn and food values f1,...,fn in each location.
-            E.g. 1,3||2,2 represents species objects with ids 1 and 3, and food objects of values 2 and 2, occupying this location
         display_traits : bool
             If true, pretty print all traits of living species in a table (default is True)
         """
 
         # Pretty print self.grid
+        #   Each location is represented as s1,...,sn||f1,...,fn for species ids s1,...,sn and food values f1,...,fn in each location.
+        #   E.g. 1,3||2,2 represents species objects with ids 1 and 3, and food objects of values 2 and 2, occupying this location
         if display_grid:
 
             pprint_grid = [[None for _ in range(self.grid_length_size)] for _ in range(
@@ -567,3 +582,4 @@ class World:
                       'Vision', 'Aggression', 'Energy']] + species_traits_list
 
             print(tabulate(table, headers='firstrow', tablefmt='fancygrid'))
+            print("\n")
