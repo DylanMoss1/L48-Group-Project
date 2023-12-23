@@ -69,12 +69,15 @@ class DebugInfo:
     ----------
     period : int 
         The number of days to wait before printing debug info (default is 1)
+    should_display_day : bool 
+        Should display the current day of the simulation (default is False)
     should_display_grid : bool 
         Should the grid state be printed in the debug info (default is False) 
     should_display_traits : bool
         Should the traits of each species be printed in the debug info (default is False) 
     """
     period: int = 1
+    should_display_day: bool = False
     should_display_grid: bool = False
     should_display_traits: bool = False
 
@@ -225,6 +228,10 @@ class World:
             Determines how much information should be printed to the console during the program's execution (default is no debug info)
         """
         if self.day % debug_info.period == 0:
+
+            if debug_info.should_display_day: 
+                print("Day number:", self.day)
+
             self.pprint(debug_info.should_display_grid,
                         debug_info.should_display_traits)
 
