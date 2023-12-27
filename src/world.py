@@ -247,8 +247,6 @@ class World:
             The log item entry for this timestep of the simulation (important values for emulation training: see LogItem)
         """
 
-        self.day += 1
-
         traits_dict = self.get_traits_of_living_species()
         temperature, probability_of_food = self.add_food_to_grid()
 
