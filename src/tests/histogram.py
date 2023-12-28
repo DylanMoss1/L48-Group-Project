@@ -1,4 +1,6 @@
+import math
 import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 from simulator import MainSimulator
@@ -52,6 +54,15 @@ def run_simulator(nruns: int, save_results: bool = True, save_location: str = No
     
     return matrix
 
-def graph_histograph(results: np.ndarray):
+def graph_histograph(results: np.ndarray, save_results: bool = True, save_location: str = None):
     """Graphs a histogram of results from simulator runs."""
-    pass
+    log_names = results.dtype.names
+    
+    fig, axes = plt.subplots(math.ceil(len(log_names) / 4), 4)
+    for i, name in enumerate(log_names):
+        sns.histplot(results[name], ax=axes[i])
+        
+    if save_results:
+        if save_location is None:
+            save_location = "/histogram.png"
+        fig.savefig(save_location)
