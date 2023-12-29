@@ -1,108 +1,88 @@
-from typing import Tuple
+from abc import ABC, abstractmethod
 
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from GPy.models import GPRegression
-from emukit.core.interfaces import IModel, IModelWithNoise
+from emukit.model_wrappers import GPyModelWrapper
+from emukit.core.acquisition import Acquisition
+from emukit.core.parameter_space import ParameterSpace
+from emukit.core.initial_designs.latin_design import LatinDesign
+from emukit.experimental_design import ExperimentalDesignLoop
+from emukit.sensitivity.monte_carlo import MonteCarloSensitivity
 
-class GeneticDriftModel(IModel, IModelWithNoise):
-    def __init__(self, X: np.ndarray, Y: np.ndarray):
-        """Initializes a GP model using GPy with an RBF kernel (variance 1, lengthscale 1) and Gaussian likelihood (noise variance 1)
+NOISE_VAR = 1.0
+INITIAL_SAMPLE = 20
+BATCH_SIZE = 5
+MAX_ITERS = 10
 
-        Args:
-            X (np.ndarray): array of shape (n_points x n_inputs) of initial points
-            Y (np.ndarray): array of shape (n_points x n_outputs) of initial points
-        """
-        self.model = GPRegression(X, Y)
-    
-    def predict(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Predict mean and variance values for given points
-
-        :param X: array of shape (n_points x n_inputs) of points to run prediction for
-        :return: Tuple of mean and variance which are 2d arrays of shape (n_points x n_outputs)
-        """
-        return self.model.predict(X)
-    
-    def predict_noiseless(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        For given points X, predict mean and variance of the output without observation noise.
-
-        :param X: array of shape (n_points x n_inputs) of points to run prediction for
-        :return: Tuple of mean and variance which are 2d arrays of shape (n_points x n_outputs)
-        """
-        return self.model.predict(X, include_likelihood=False)
-
-    def optimize(self) -> None:
-        """
-        Optimize hyper-parameters of model
-        """
-        raise NotImplementedError
-
-    def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
-        """
-        Sets training data in model
-
-        :param X: new points
-        :param Y: function values at new points X
-        """
-        self.model.set_XY(X, Y)
-
-    @property
-    def X(self):
-        return self.model.X
-
-    @property
-    def Y(self):
-        return self.model.Y
-
-class PopulationModel(IModel, IModelWithNoise):
-    def __init__(self, X: np.ndarray, Y: np.ndarray):
-        """Initializes a GP model using GPy with an RBF kernel (variance 1, lengthscale 1) and Gaussian likelihood (noise variance 1)
+class BaseEmulator(ABC):
+    def __init__(self, space: ParameterSpace, acquisition: Acquisition):
+        """Initializes the GP model, EmuKit wrapper, and initial sampling points.
 
         Args:
-            X (np.ndarray): array of shape (n_points x n_inputs) of initial points
-            Y (np.ndarray): array of shape (n_points x n_outputs) of initial points
+            space (ParameterSpace): Describes the input variables to the model and any constraints.
+            acquisition (Acquisition): Describes the acquisition function to use for optimization.
         """
-        self.model = GPRegression(X, Y)
+        # initial sample of points
+        design = LatinDesign(space)
+        X = design.get_samples(INITIAL_SAMPLE)
+        Y = self.run_simulator(X)
+        
+        # initialize model
+        gpy_model = GPRegression(X, Y, NOISE_VAR)
+        self.model = GPyModelWrapper(gpy_model)
+        self.parameter_space = space
+        self.acquisition_function = acquisition(model = self.model)
     
-    def predict(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Predict mean and variance values for given points
+    @abstractmethod
+    def run_simulator(self, params: np.ndarray) -> np.ndarray:
+        """Function to generate data to train the emulator.
 
-        :param X: array of shape (n_points x n_inputs) of points to run prediction for
-        :return: Tuple of mean and variance which are 2d arrays of shape (n_points x n_outputs)
+        Args:
+            params (np.ndarray): An array of (point_count x space_dim). The inputs to run the function (simulator) at. Determined by the sampling process and parameter space.
+
+        Returns:
+            np.ndarray: The outputs of the function (in this case, the simulator).
         """
-        return self.model.predict(X)
+        return NotImplemented
     
-    def predict_noiseless(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def train(self) -> None:
+        """Runs the experimental design loop to train the emulator.
+        
+        Updates model hyper-parameters using MLE every 'batch_size' iterations.
+        Uses the acquisition function to determine which points to sample next.
         """
-        For given points X, predict mean and variance of the output without observation noise.
+        expdesign_loop = ExperimentalDesignLoop(model = self.model,
+                                                space = self.parameter_space,
+                                                acquisition = self.acquisition_function,
+                                                batch_size = BATCH_SIZE)
+        expdesign_loop.run_loop(self.run_simulator, MAX_ITERS)
+    
+    def sensitivity_analysis(self, save_results: bool = False, save_location: str = None) -> None:
+        """Performs sensitivity analysis using Monte Carlo integration methods with emulator sampling.
+        
+        Graphs the first-order sobel indices and total effects for each input variable.
 
-        :param X: array of shape (n_points x n_inputs) of points to run prediction for
-        :return: Tuple of mean and variance which are 2d arrays of shape (n_points x n_outputs)
+        Args:
+            save_results (bool, optional): Save the resulting bar graph. Defaults to False.
+            save_location (str, optional): Save location. Defaults to None.
         """
-        return self.model.predict(X, include_likelihood=False)
+        senstivity = MonteCarloSensitivity(model = self.model, input_domain = self.parameter_space)
+        main_effects, total_effects, _ = senstivity.compute_effects(num_monte_carlo_points = 10000)
+        
+        fig, axes = plt.subplots(1, 2)
+        sns.barplot(main_effects, ax=axes[0])
+        sns.barplot(total_effects, ax=axes[1])
+        
+        if save_results:
+            if save_location is None:
+                save_location = "/sensitivity.png"
+            fig.savefig(save_location)
 
-    def optimize(self) -> None:
-        """
-        Optimize hyper-parameters of model
-        """
-        raise NotImplementedError
+class GeneticDriftModel(BaseEmulator):
+    pass
 
-    def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
-        """
-        Sets training data in model
-
-        :param X: new points
-        :param Y: function values at new points X
-        """
-        self.model.set_XY(X, Y)
-
-    @property
-    def X(self):
-        return self.model.X
-
-    @property
-    def Y(self):
-        return self.model.Y
+class PopulationModel(BaseEmulator):
+    pass
