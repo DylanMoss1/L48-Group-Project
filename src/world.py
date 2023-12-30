@@ -340,7 +340,7 @@ class World:
             Temperature on the current day
         """
 
-        return 8 - 18 * math.cos(2 * math.pi * self.day / 365)
+        return 8 - 18 * math.cos(2 * math.pi * self.day / 365) + 0.19 * (self.day / (365 * 10))
 
     def add_food_to_grid(self) -> None:
         """
