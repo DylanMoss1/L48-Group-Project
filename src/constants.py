@@ -7,6 +7,8 @@ simulation_constants = yaml.safe_load(
 
 # Assign dictionary contents to python constant variables
 
+# -- SEE ./config/simulation_constants.yml FOR EXPLAINATIONS OF CONSTANTS -- 
+
 NUM_INITIAL_SPECIES_FRACTION = simulation_constants["NUM_INITIAL_SPECIES_FRACTION"]
 NUM_ACTIONS_PER_DAY = simulation_constants["NUM_ACTIONS_PER_DAY"]
 
