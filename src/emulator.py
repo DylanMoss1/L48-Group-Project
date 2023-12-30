@@ -7,10 +7,14 @@ import seaborn as sns
 from GPy.models import GPRegression
 from emukit.model_wrappers import GPyModelWrapper
 from emukit.core.acquisition import Acquisition
-from emukit.core.parameter_space import ParameterSpace
+from emukit.experimental_design.acquisitions import ModelVariance
+from emukit.bayesian_optimization.acquisitions import MaxValueEntropySearch
+from emukit.core.parameter_space import ParameterSpace, ContinuousParameter, DiscreteParameter
 from emukit.core.initial_designs.latin_design import LatinDesign
 from emukit.experimental_design import ExperimentalDesignLoop
 from emukit.sensitivity.monte_carlo import MonteCarloSensitivity
+
+from simulator import MainSimulator
 
 NOISE_VAR = 1.0
 INITIAL_SAMPLE = 20
@@ -18,13 +22,16 @@ BATCH_SIZE = 5
 MAX_ITERS = 10
 
 class BaseEmulator(ABC):
-    def __init__(self, space: ParameterSpace, acquisition: Acquisition):
+    def __init__(self, space: ParameterSpace, acquisition: Acquisition, *acq_args):
         """Initializes the GP model, EmuKit wrapper, and initial sampling points.
 
         Args:
             space (ParameterSpace): Describes the input variables to the model and any constraints.
             acquisition (Acquisition): Describes the acquisition function to use for optimization.
         """
+        # initialize simulator
+        self.simulator = MainSimulator()
+        
         # initial sample of points
         design = LatinDesign(space)
         X = design.get_samples(INITIAL_SAMPLE)
@@ -34,7 +41,7 @@ class BaseEmulator(ABC):
         gpy_model = GPRegression(X, Y, NOISE_VAR)
         self.model = GPyModelWrapper(gpy_model)
         self.parameter_space = space
-        self.acquisition_function = acquisition(model = self.model)
+        self.acquisition_function = acquisition(model = self.model, *acq_args)
     
     @abstractmethod
     def run_simulator(self, params: np.ndarray) -> np.ndarray:
@@ -82,7 +89,47 @@ class BaseEmulator(ABC):
             fig.savefig(save_location)
 
 class GeneticDriftModel(BaseEmulator):
-    pass
+    """A model for emulating genetic drift (i.e., the change in trait distributions after each timestep)."""
+    def __init__(self):
+        space = ParameterSpace([
+            DiscreteParameter("population", range(0, 300)),
+            DiscreteParameter("births", range(0, 20)),
+            DiscreteParameter("deaths", range(0, 20)),
+            ContinuousParameter("mr_size", 0, 3),
+            ContinuousParameter("mr_speed", 0, 3),
+            ContinuousParameter("mr_vision", 0, 3),
+            ContinuousParameter("mr_agg", 0, 3),
+            ContinuousParameter("mean_size", 0, 6),
+            ContinuousParameter("var_size", 0, 6),
+            ContinuousParameter("mean_speed", 0, 6),
+            ContinuousParameter("var_speed", 0, 6),
+            ContinuousParameter("mean_vision", 0, 6),
+            ContinuousParameter("var_vision", 0, 6),
+            ContinuousParameter("mean_agg", 0, 6),
+            ContinuousParameter("var_agg", 0, 6),
+            ContinuousParameter("temp", -10, 35)
+        ])
+        super().__init__(space, ModelVariance)
+        
+    def run_simulator(self, params: np.ndarray) -> np.ndarray:
+        pass
 
 class PopulationModel(BaseEmulator):
-    pass
+    """A model for emulating the population (i.e., the changes in population during the simulation of each timestep)."""
+    def __init__(self):
+        space = ParameterSpace([
+            DiscreteParameter("population", range(0, 300)),
+            ContinuousParameter("mean_size", 0, 6),
+            ContinuousParameter("var_size", 0, 6),
+            ContinuousParameter("mean_speed", 0, 6),
+            ContinuousParameter("var_speed", 0, 6),
+            ContinuousParameter("mean_vision", 0, 6),
+            ContinuousParameter("var_vision", 0, 6),
+            ContinuousParameter("mean_agg", 0, 6),
+            ContinuousParameter("var_agg", 0, 6),
+            ContinuousParameter("temp", -10, 35)
+        ])
+        super().__init__(space, MaxValueEntropySearch, space)
+        
+    def run_simulator(self, params: np.ndarray) -> np.ndarray:
+        pass
