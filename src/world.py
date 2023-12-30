@@ -332,8 +332,6 @@ class World:
 
         We compute seasonal variance as: 8 - 18cos(2π * days / 365) as seen in Chapter 4.2 of https://link.springer.com/article/10.1007/s11538-008-9389-z.
 
-        TODO: implement climate change
-
         Returns
         -------
         temperature : float
