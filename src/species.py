@@ -58,6 +58,7 @@ class Species:
         self.energy = constants.INITIAL_ENERGY
         self.death = False
         self.last_moved_direction = None
+        self.hibernate = False
 
     def get_traits(self) -> Dict[str, float]:
         """

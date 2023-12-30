@@ -13,8 +13,8 @@ FOOD_PROBABILITY_STD: 10
 # The temperature in which the most food is produced 
 OPTIMAL_TEMPERATURE: 10
 
-# @Atreyi: to explain 
-SPEED_MODIFIER: 10
+# @Atreyi: choosing a different metric without a speed modifier here, expalined in more detail in world.py
+MAXIMUM_SPEED: 3
 
 # Initial energy of a species during *initial* population (not during reproduction)
 INITIAL_ENERGY: 5
@@ -25,7 +25,7 @@ ENERGY_LOSS: 0.5
 # Initial trait values 
 INITIAL_SIZE: 1
 INITIAL_SPEED: 1
-INITIAL_VISION: 1
+INITIAL_VISION: 0
 INITIAL_AGGRESSION: 1
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)

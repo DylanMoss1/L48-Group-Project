@@ -262,6 +262,7 @@ class World:
 
         traits_dict = self.get_traits_of_living_species()
         temperature, probability_of_food = self.add_food_to_grid()
+        self.species_hibernate()
 
         for action_number in range(self.num_actions_per_day):
             self.species_move(action_number)
@@ -526,19 +527,23 @@ class World:
         """
 
         '''
-        TODO: Add hibernate
+        Explanation: The code has been changed to use a slowness factor instead. 
+        The fastest creature statisfies the modulo able_to_move condition at all times with slowness factor 1. 
+        A creature which is half as fast will satisfy the able_to_move condition half the action steps with slowness factor
+        2 and so on
         '''
 
-        speed_modifier = constants.SPEED_MODIFIER
+        maximum_speed = constants.MAXIMUM_SPEED
 
         moved_species = []
 
         for row_index, row in enumerate(self.grid):
             for col_index, location in enumerate(row):
                 for species in location.species_list:
-
-                    able_to_move = (action_number %
-                                    species.speed) * speed_modifier == 0
+               
+                    slowness_factor = (int)(maximum_speed/species.speed)
+                    
+                    able_to_move = action_number % slowness_factor == 0 and (not species.hibernate)
 
                     has_previously_moved = species.id in moved_species
 
@@ -616,16 +621,31 @@ class World:
                                     species.energy -= species.aggression / 2
                     location.food_list = []
 
+    def species_hibernate(self) -> None:
+        """
+        At the beginning of each day each creature may hibernate with a probability proportional to its size
+        """
+        for row in self.grid:
+            for location in row:
+                for species in location.species_list:
+                    hibernation_risk = (species.size - 1)/2
+                    hibernate = random.random() < hibernation_risk
+                    species.hibernate = hibernate
+
     def species_lose_energy(self) -> None:
         """
         Each species loses a set amount of energy at the end of every day. 
+        This energy loss is proportional to the square of the speed of the species.
+        Species lose an additional amount of energy proportional to their vision trait 
         """
 
-        energy_loss = constants.ENERGY_LOSS
+        energy_loss_base = constants.ENERGY_LOSS
 
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
+                    energy_loss = (species.speed**2) * energy_loss_base
+                    energy_loss += ((species.vision) * energy_loss_base)/2
                     species.energy -= energy_loss
 
     def species_reproduce(self) -> None:
