@@ -762,8 +762,9 @@ class World:
                                 max_damage = 0
                         else:
                             max_damage = max(aggression)
+                        # @Atreyi to check
                         winner_hawk = location.species_list[random.sample(
-                            winner_hawk_indices, 1)].id
+                            winner_hawk_indices, 1)[0]].id
                         for species in location.species_list:
                             if species.aggression > 1:
                                 if species.id == winner_hawk:
