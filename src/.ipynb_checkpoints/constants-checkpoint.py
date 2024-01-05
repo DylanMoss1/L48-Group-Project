@@ -7,8 +7,6 @@ simulation_constants = yaml.safe_load(
 
 # Assign dictionary contents to python constant variables
 
-# -- SEE ./config/simulation_constants.yml FOR EXPLAINATIONS OF CONSTANTS -- 
-
 NUM_INITIAL_SPECIES_FRACTION = simulation_constants["NUM_INITIAL_SPECIES_FRACTION"]
 NUM_ACTIONS_PER_DAY = simulation_constants["NUM_ACTIONS_PER_DAY"]
 
@@ -16,8 +14,7 @@ FOOD_PROBABILITY_SCALAR = simulation_constants["FOOD_PROBABILITY_SCALAR"]
 FOOD_PROBABILITY_STD = simulation_constants["FOOD_PROBABILITY_STD"]
 OPTIMAL_TEMPERATURE = simulation_constants["OPTIMAL_TEMPERATURE"]
 
-MAXIMUM_SPEED = simulation_constants["MAXIMUM_SPEED"]
-
+SPEED_MODIFIER = simulation_constants["SPEED_MODIFIER"]
 
 INITIAL_ENERGY = simulation_constants["INITIAL_ENERGY"]
 ENERGY_LOSS = simulation_constants["ENERGY_LOSS"]
