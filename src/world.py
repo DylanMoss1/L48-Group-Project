@@ -165,28 +165,10 @@ class World:
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
         ]
-        self.populate_grid()
 
-    def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
+    def set_mutation_rates(self, mutation_rates) -> None:
         """
-        Run the World simulation with given mutation rates until the species goes extinct. 
-
-        Parameters
-        ----------
-        mutation_rates : dict(string, int)
-            Contains keys: size, speed, vision, aggression. 
-            With corresponding values representing the mutation rates for each trait 
-        debug_info : DebugInfo 
-            Determines how much information should be printed to the console during the program's execution (default is no debug info)
-        max_days : optional(int)
-            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
-
-        Returns 
-        -------
-        days_survived : int 
-            The number of days the species has survived until extinction 
-        log : list(LogItem)
-            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+        Set the mutation rate values of the World instance. 
 
         Attributes 
         ----------
@@ -211,7 +193,25 @@ class World:
             "aggression": mutation_rates["aggression"]
         }
 
-        self.day = 0
+    def run_simulation_loop(self, debug_info=DebugInfo(), max_days=None):
+        """
+        Run the World simulation until the species goes extinct. 
+
+        Parameters
+        ----------
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
+
+        Returns 
+        -------
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+        """
+
         log = []
         is_extinct = False
 
@@ -230,6 +230,82 @@ class World:
         days_survived = self.day
 
         return days_survived, log
+
+    def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
+        """
+        Run the World simulation with given mutation rates until the species goes extinct. 
+
+        Parameters
+        ----------
+        mutation_rates : dict(string, int)
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values representing the mutation rates for each trait 
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
+
+        Returns 
+        -------
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+        """
+
+        self.populate_grid()
+        self.day = 0
+
+        self.set_mutation_rates(self, mutation_rates)
+        return self.run_simulation_loop(self, debug_info, max_days)
+
+    def run_from_start_point(self, mutation_rates, day_start_point, population_start_point, mutation_start_point, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
+        """
+        Run the World simulation from a start point with given mutation rates until the species goes extinct. 
+        The current day, population and mean + std of each mutation trait are given for the start point. 
+
+        Parameters
+        ----------
+        mutation_rates : dict(string, int)
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values representing the mutation rates for each trait 
+        day_start_point : int 
+            The day in which the simulation starts from (assert that 0 <= day_start_point and day_start_point < max_days if max_days is not None)
+        population_start_point : int 
+            The population at the simulation start point (assert that 0 <= population_start_point <= (self.grid_length_size ** 2))        
+        mutation_start_point : dict(string, (int, int))
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values (mean, std) for the current mean and std of each trait
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
+
+        Returns 
+        -------
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+
+        Attributes 
+        ----------
+        size_mutation_rate : int 
+            Mutation rate for species size: size_{t+1} = N(size_t, size_mutation_rate)
+        speed_mutation_rate : int 
+            Mutation rate for species speed: speed_{t+1} = N(speed_t, speed_mutation_rate)
+        vision_mutation_rate : int 
+            Mutation rate for species vision: vision_{t+1} = N(vision_t, vision_mutation_rate)
+        aggression_mutation_rate : int 
+            Mutation rate for species aggression: aggression_{t+1} = N(aggression_t, aggression_mutation_rate)
+        """
+
+        self.populate_grid_from_start_point(
+            population_start_point, mutation_start_point)
+        self.day = day_start_point
+
+        self.set_mutation_rates(self, mutation_rates)
+        return self.run_simulation_loop(self, debug_info, max_days)
 
     def debug(self, debug_info) -> None:
         """
@@ -294,6 +370,43 @@ class World:
         for species_x, species_y in species_location_set:
             # Add new species instances at every location in the set
             self.grid[species_y][species_x].add_species(Species())
+
+    def populate_grid_from_start_point(self, population_start_point, mutation_start_point) -> None:
+        """
+        Fill self.grid with population_start_point number of initial species.
+        The mutations of these species are described by the mean and std in mutation_start_point
+
+        Parameters
+        ----------
+        population_start_point : int 
+            The population at the simulation start point (assert that 0 <= population_start_point <= (self.grid_length_size ** 2))        
+        mutation_start_point : dict(string, (int, int))
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values (mean, std) for the current mean and std of each trait
+        """
+
+        species_location_set = set()  # Using sets so that locations are unique
+
+        # Keep adding locations until the set contains 4 unique locations
+        while len(species_location_set) < population_start_point:
+            random_tuple = (random.randint(0, self.grid_length_size - 1),
+                            random.randint(0, self.grid_length_size - 1))
+            species_location_set.add(random_tuple)
+
+        for species_x, species_y in species_location_set:
+
+            # Add new species instances at every location in the set
+            size = random.normal(
+                loc=mutation_start_point["size"][0], scale=mutation_start_point["size"][1])
+            speed = random.normal(
+                loc=mutation_start_point["speed"][0], scale=mutation_start_point["speed"][1])
+            vision = random.normal(
+                loc=mutation_start_point["vision"][0], scale=mutation_start_point["vision"][1])
+            aggression = random.normal(
+                loc=mutation_start_point["aggression"][0], scale=mutation_start_point["aggression"][1])
+
+            self.grid[species_y][species_x].add_species(
+                Species(size=size, speed=speed, vision=vision, aggression=aggression))
 
     def get_traits_of_living_species(self) -> Dict[str, List[float]]:
         """
@@ -540,10 +653,11 @@ class World:
         for row_index, row in enumerate(self.grid):
             for col_index, location in enumerate(row):
                 for species in location.species_list:
-               
+
                     slowness_factor = (int)(maximum_speed/species.speed)
-                    
-                    able_to_move = action_number % slowness_factor == 0 and (not species.hibernate)
+
+                    able_to_move = action_number % slowness_factor == 0 and (
+                        not species.hibernate)
 
                     has_previously_moved = species.id in moved_species
 
