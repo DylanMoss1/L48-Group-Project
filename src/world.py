@@ -267,6 +267,7 @@ class World:
         for action_number in range(self.num_actions_per_day):
             self.species_move(action_number)
             self.species_consume_food()
+            self.species_reproduce()
 
         self.species_lose_energy()
         num_species_alive = self.species_die()
@@ -311,7 +312,7 @@ class World:
             }
         """
 
-        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": []}
+        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": [], "energy": []}
 
         for row in self.grid:
             for location in row:
@@ -320,6 +321,7 @@ class World:
                     traits_dict["speed"].append(species.speed)
                     traits_dict["vision"].append(species.vision)
                     traits_dict["aggression"].append(species.aggression)
+                    traits_dict["energy"].append(species.energy)
 
         return traits_dict
 
@@ -413,7 +415,7 @@ class World:
 
         return True
 
-    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> list(str):
+    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
         """
         Returns a list of all locations (in form (row_index, col_index)) of food found with a set vision. 
         Note that we only look at positions EXACTLY as far as the vision, not any less than the vision.
@@ -453,6 +455,10 @@ class World:
 
         return food_locations
 
+    def is_food_at_location(self, currently_observed_location) -> bool:
+        row_index, col_index = currently_observed_location
+        return len(self.grid[row_index][col_index].food_list) > 0
+
     def decide_direction(self, species, species_location, possible_directions) -> str:
         """
         Given the possible directions that a species can take, determine the best direction they should move in. 
@@ -489,7 +495,7 @@ class World:
         current_species_row_index, current_species_col_index = species_location
 
         # Look {vision // 1} spaces in all possible directions
-        for current_vision in range(1, vision + 1):
+        for current_vision in range(1, math.floor(vision) + 1):
 
             food_locations = self.food_locations_found_in_vision(
                 possible_directions, current_species_row_index, current_species_col_index, current_vision)
@@ -497,7 +503,17 @@ class World:
             # Return the closest food found
             # Ties broken randomly
             if len(food_locations) > 0:
-                return random.choice(food_locations)
+                food_choice = random.choice(food_locations)
+                row_index, col_index = food_choice
+                # print(food_choice,species_location)
+                if row_index < current_species_row_index:
+                    return 'N'
+                elif row_index > current_species_row_index:
+                    return 'S'
+                elif col_index < current_species_col_index:
+                    return 'W'
+                elif col_index > current_species_col_index:
+                    return 'E'
 
         # If no food found so far...
         # Look {vision // 1} + 1 spaces in all possible directions
@@ -506,9 +522,18 @@ class World:
 
         # If food found, move towards food with (vision - vision // 1) probability -- that is with probability U[0, 1] < (vision % 1)
         if len(food_locations) > 0 and random.random() < (vision % 1):
-            return random.choice(food_locations)
-        else:
-            return random.choice(possible_directions)
+            food_choice = random.choice(food_locations)
+            row_index, col_index = food_choice
+            # print(food_choice,species_location)
+            if row_index < current_species_row_index:
+                return 'N'
+            elif row_index > current_species_row_index:
+                return 'S'
+            elif col_index < current_species_col_index:
+                return 'W'
+            elif col_index > current_species_col_index:
+                return 'E'
+        return random.choice(possible_directions)
 
     def species_move(self, action_number) -> None:
         """
@@ -554,24 +579,38 @@ class World:
                         remaining_directions = World.directions.copy()
 
                         # Remove previously moved direction
-                        if species.last_moved_direction in remaining_directions:
-                            remaining_directions.remove(
-                                species.last_moved_direction)
+                        # if species.last_moved_direction in remaining_directions:
+                        #    remaining_directions.remove(
+                        #        species.last_moved_direction)
+
+                        if species.last_moved_direction == 'N' and 'S' in remaining_directions:
+                            remaining_directions.remove('S')
+                        elif species.last_moved_direction == 'S' and 'N' in remaining_directions:
+                            remaining_directions.remove('N')
+                        elif species.last_moved_direction == 'W' and 'E' in remaining_directions:
+                            remaining_directions.remove('E')
+                        elif species.last_moved_direction == 'E' and 'W' in remaining_directions:
+                            remaining_directions.remove('W')
 
                         # Remove all directions where the species goes off the grid
+                        possible_directions = []
                         for direction in remaining_directions:
                             row_change, col_change = World.directions_to_location_change[direction]
-
-                            if not self.is_valid_location(row_index + row_change, col_index + col_change):
-                                remaining_directions.remove(direction)
+                            new_location = row_index + row_change, col_index + col_change
+                            if self.is_valid_location(new_location):
+                                possible_directions.append(direction)
+                            remaining_directions = possible_directions
+                            # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
+                                # print((row_index,col_index), remaining_directions)
 
                         # 3) Figure out the best direction the species can move (according to its vision)
-                        new_direction = self.decide_direction(
-                            remaining_directions)
-
+                        current_location = row_index, col_index
+                        new_direction = self.decide_direction(species, current_location, remaining_directions)
+                        
                         # 4) Set this as the species' last moved direction, and make a move in this direction
                         species.last_moved_direction = new_direction
-
+                        # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
+                            # print((row_index,col_index),new_direction, remaining_directions)
                         row_change, col_change = World.directions_to_location_change[new_direction]
 
                         self.add_species_to_grid(
@@ -592,33 +631,36 @@ class World:
 
         for row in self.grid:
             for location in row:
-                if len(location.species_list) > 0 and len(
-                        location.food_list) > 0:
-                    aggression = [
-                        species.aggression for species in location.species_list]
-                    if all(aggr <= 1 for aggr in aggression):
+                if len(location.species_list) > 0 and len(location.food_list) > 0:
+                    if len(location.species_list) == 1:
                         for species in location.species_list:
-                            species.energy += len(location.food_list) / \
-                                len(location.species_list)
+                            species.energy += len(location.food_list)
                     else:
-                        winner_hawk_indices = [
-                            i for i, j in enumerate(aggression)if j == max(aggression)]
-                        if len(winner_hawk_indices) == 1:
-                            max_damage = max(
-                                [i for i in aggression if i < max(aggression)])
-                            if max_damage <= 1:
-                                max_damage = 0
+                        aggression = [
+                            species.aggression for species in location.species_list]
+                        if all(aggr <= 1 for aggr in aggression):
+                            for species in location.species_list:
+                                species.energy += len(location.food_list) / \
+                                    len(location.species_list)
                         else:
-                            max_damage = max(aggression)
-                        winner_hawk = location.species_list[random.sample(
-                            winner_hawk_indices, 1)].id
-                        for species in location.species_list:
-                            if species.aggression > 1:
-                                if species.id == winner_hawk:
-                                    species.energy += len(location.food_list)
-                                    species.energy -= max_damage / 2
-                                else:
-                                    species.energy -= species.aggression / 2
+                            winner_hawk_indices = [
+                                i for i, j in enumerate(aggression)if j == max(aggression)]
+                            if len(winner_hawk_indices) == 1:
+                                max_damage = max(
+                                    [i for i in aggression if i < max(aggression)])
+                                if max_damage <= 1:
+                                    max_damage = 0
+                            else:
+                                max_damage = max(aggression)
+                            winner_hawk = location.species_list[random.sample(
+                                winner_hawk_indices, 1)[0]].id
+                            for species in location.species_list:
+                                if species.aggression > 1:
+                                    if species.id == winner_hawk:
+                                        species.energy += len(location.food_list)
+                                        species.energy -= max_damage / 2
+                                    else:
+                                        species.energy -= species.aggression / 2
                     location.food_list = []
 
     def species_hibernate(self) -> None:
@@ -666,7 +708,7 @@ class World:
                         # Add random mutation to generate child's trait values
                         child_traits = Species.get_child_traits(
                             parent_traits, self.mutation_rates)
-
+                        # print(child_traits)
                         # Generate a child from these trait values
                         location.add_species(Species(
                             size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))

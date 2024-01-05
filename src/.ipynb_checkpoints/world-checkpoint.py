@@ -124,6 +124,11 @@ class World:
 
     Attributes
     ----------
+    directions : static(list(str))
+        Directions that the species can move in on the grid: ['N', 'S', 'W', 'E']
+    directions_to_location_change : static(dict(str, tuple(int, int)))
+        Maps directions to a location change tuple. E.g. 'N' -> (-1, 0) for 1 step up the 2D array and 0 steps to the right
+
     grid_length_size : int
         Length of each size of the simulation grid.
     num_inital_species : constant(int)
@@ -135,6 +140,14 @@ class World:
     grid : list(list(Location))
         Stores the current state of the world. A grid_size x grid_size matrix of Location instances
     """
+
+    directions = ['N', 'S', 'W', 'E']
+    directions_to_location_change = {
+        'N': (-1, 0),
+        'S': (1, 0),
+        'E': (0, 1),
+        'W': (0, -1),
+    }
 
     def __init__(self, grid_length_size) -> None:
         """
@@ -229,7 +242,7 @@ class World:
         """
         if self.day % debug_info.period == 0:
 
-            if debug_info.should_display_day: 
+            if debug_info.should_display_day:
                 print("Day number:", self.day)
 
             self.pprint(debug_info.should_display_grid,
@@ -247,14 +260,14 @@ class World:
             The log item entry for this timestep of the simulation (important values for emulation training: see LogItem)
         """
 
-        self.day += 1
-
         traits_dict = self.get_traits_of_living_species()
         temperature, probability_of_food = self.add_food_to_grid()
+        self.species_hibernate()
 
         for action_number in range(self.num_actions_per_day):
             self.species_move(action_number)
             self.species_consume_food()
+            self.species_reproduce()
 
         self.species_lose_energy()
         num_species_alive = self.species_die()
@@ -299,7 +312,7 @@ class World:
             }
         """
 
-        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": []}
+        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": [], "energy": []}
 
         for row in self.grid:
             for location in row:
@@ -308,6 +321,7 @@ class World:
                     traits_dict["speed"].append(species.speed)
                     traits_dict["vision"].append(species.vision)
                     traits_dict["aggression"].append(species.aggression)
+                    traits_dict["energy"].append(species.energy)
 
         return traits_dict
 
@@ -319,15 +333,13 @@ class World:
 
         We compute seasonal variance as: 8 - 18cos(2π * days / 365) as seen in Chapter 4.2 of https://link.springer.com/article/10.1007/s11538-008-9389-z.
 
-        TODO: implement climate change
-
         Returns
         -------
         temperature : float
             Temperature on the current day
         """
 
-        return 8 - 18 * math.cos(2 * math.pi * self.day / 365)
+        return 8 - 18 * math.cos(2 * math.pi * self.day / 365) + 0.19 * (self.day / (365 * 10))
 
     def add_food_to_grid(self) -> None:
         """
@@ -362,14 +374,176 @@ class World:
 
         return temperature, probability_of_food
 
-    def add_species_to_grid(self, species, row_index, col_index):
+    def add_species_to_grid(self, species, row_index, col_index) -> None:
+        """
+        Add a given species to the grid at a given row and column index. 
+
+        Parameters
+        ----------
+        species : Species
+            Species to be added to grid  
+        row_index : int 
+            Index of grid row where the species should be added 
+        col_index : int 
+            Index of grid col where the species should be added 
+        """
+
         self.grid[row_index][col_index].add_species(species)
+
+    def is_valid_location(self, location) -> bool:
+        """
+        Returns true if a given location (in form (row_index, col_index)) is within the boundaries of the grid.
+
+        Parameters
+        ----------
+        location : (int, int)
+            Location represented in form (row_index, col_index)
+
+        Returns 
+        -------
+        is_valid_location : bool 
+            Is true if a given location (in form (row_index, col_index)) is within the boundaries of the grid  
+        """
+
+        col_index, row_index = location
+
+        if col_index < 0 or col_index >= self.grid_length_size:
+            return False
+
+        if row_index < 0 or row_index >= self.grid_length_size:
+            return False
+
+        return True
+
+    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
+        """
+        Returns a list of all locations (in form (row_index, col_index)) of food found with a set vision. 
+        Note that we only look at positions EXACTLY as far as the vision, not any less than the vision.
+
+        Parameters
+        ----------
+        possible_directions : list(str)
+            A subset of World.directions (['N', 'S', 'W', 'E']), containing all directions the species can possibly move in 
+        current_species_row_index : int 
+            Current row index of the species on the grid 
+        current_species_col_index : int 
+            Current col index of the species on the grid 
+        current_vision : int 
+            The current vision range we are examining (we only look at locations EXACTLY this far)
+
+        Returns
+        -------
+        food_locations : list(str)
+            List of all locations containing food found with the set vision 
+        """
+
+        food_locations = []
+
+        for direction in possible_directions:
+
+            row_change, col_change = World.directions_to_location_change[direction]
+
+            # The indices of the location the species is currently looking at (to find food)
+
+            currently_observed_row_index = current_species_row_index + row_change * current_vision
+            currently_observed_col_index = current_species_col_index + col_change * current_vision
+
+            currently_observed_location = currently_observed_row_index, currently_observed_col_index
+
+            if self.is_valid_location(currently_observed_location) and self.is_food_at_location(currently_observed_location):
+                food_locations.append(currently_observed_location)
+
+        return food_locations
+
+    def is_food_at_location(self, currently_observed_location) -> bool:
+        row_index, col_index = currently_observed_location
+        return len(self.grid[row_index][col_index].food_list) > 0
+
+    def decide_direction(self, species, species_location, possible_directions) -> str:
+        """
+        Given the possible directions that a species can take, determine the best direction they should move in. 
+        - This should be towards the direction with the closest food in the species' vision.
+        - Ties should be broken randomly.
+        - Vision only works along rows and columns, not diagonally.
+
+        Vision of 3.4: 
+        - Look 3 spaces in all possible directions
+        - Move towards closest food found
+        - If no food found, look 4 spaces in all possible directions 
+        - If food found:
+          - 40% chance (3.4 - 3 = 0.4): Move towards food 
+          - 60% chance: Move in a random possible direction
+        - If no food found 
+          - Move in a random possible direction  
+
+        Parameters
+        ----------
+        species : Species
+            Current species that is looking to move. 
+        species_location : tuple(int, int)
+            Current location of the species that is looking to move 
+        possible_directions : list(str) 
+            A subset of World.directions (['N', 'S', 'W', 'E']), containing all directions the species can possibly move in 
+
+        Returns 
+        -------
+        best_direction : str 
+            The best direction the species can move in (based off the food found with the species' vision)
+        """
+
+        vision = species.vision
+        current_species_row_index, current_species_col_index = species_location
+
+        # Look {vision // 1} spaces in all possible directions
+        for current_vision in range(1, math.floor(vision) + 1):
+
+            food_locations = self.food_locations_found_in_vision(
+                possible_directions, current_species_row_index, current_species_col_index, current_vision)
+
+            # Return the closest food found
+            # Ties broken randomly
+            if len(food_locations) > 0:
+                food_choice = random.choice(food_locations)
+                row_index, col_index = food_choice
+                # print(food_choice,species_location)
+                if row_index < current_species_row_index:
+                    return 'N'
+                elif row_index > current_species_row_index:
+                    return 'S'
+                elif col_index < current_species_col_index:
+                    return 'W'
+                elif col_index > current_species_col_index:
+                    return 'E'
+
+        # If no food found so far...
+        # Look {vision // 1} + 1 spaces in all possible directions
+        food_locations = self.food_locations_found_in_vision(
+            possible_directions, current_species_row_index, current_species_col_index, current_vision=1)
+
+        # If food found, move towards food with (vision - vision // 1) probability -- that is with probability U[0, 1] < (vision % 1)
+        if len(food_locations) > 0 and random.random() < (vision % 1):
+            food_choice = random.choice(food_locations)
+            row_index, col_index = food_choice
+            # print(food_choice,species_location)
+            if row_index < current_species_row_index:
+                return 'N'
+            elif row_index > current_species_row_index:
+                return 'S'
+            elif col_index < current_species_col_index:
+                return 'W'
+            elif col_index > current_species_col_index:
+                return 'E'
+        return random.choice(possible_directions)
 
     def species_move(self, action_number) -> None:
         """
         All living species make a move on the grid.
 
-        Note that this cannot be in the direction they moved last.
+        For all species 
+        - 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
+        - 2) Determine what directions it can move in (not off the grid, and not the previously moved direction)
+        - 3) Figure out the best direction the species can move (according to its vision)
+        - 4) Set this as the species' last moved direction, and make a move in this direction
 
         Parameters
         ----------
@@ -378,51 +552,69 @@ class World:
         """
 
         '''
-        TODO: Add vision
-        TODO: Add hibernate
+        Explanation: The code has been changed to use a slowness factor instead. 
+        The fastest creature statisfies the modulo able_to_move condition at all times with slowness factor 1. 
+        A creature which is half as fast will satisfy the able_to_move condition half the action steps with slowness factor
+        2 and so on
         '''
-        speed_modifier = constants.SPEED_MODIFIER
-        directions = ['N', 'S', 'W', 'E']
+
+        maximum_speed = constants.MAXIMUM_SPEED
+
         moved_species = []
 
         for row_index, row in enumerate(self.grid):
             for col_index, location in enumerate(row):
                 for species in location.species_list:
+               
+                    slowness_factor = (int)(maximum_speed/species.speed)
+                    
+                    able_to_move = action_number % slowness_factor == 0 and (not species.hibernate)
 
-                    able_to_move = action_number % (
-                        species.speed) * speed_modifier == 0
                     has_previously_moved = species.id in moved_species
 
+                    # 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
                     if able_to_move and not has_previously_moved:
 
-                        directions_spec = random.sample(
-                            directions, len(directions))
+                        # 2) Determine what directions it can move in (not off the grid, and not the previously moved direction)
+                        remaining_directions = World.directions.copy()
 
-                        if species.last_moved_direction == 'N' or row_index == self.grid_length_size - 1:
-                            directions_spec.remove('S')
-                        if species.last_moved_direction == 'S' or row_index == 0:
-                            directions_spec.remove('N')
-                        if species.last_moved_direction == 'E' or col_index == self.grid_length_size - 1:
-                            directions_spec.remove('E')
-                        if species.last_moved_direction == 'W' or col_index == 0:
-                            directions_spec.remove('W')
+                        # Remove previously moved direction
+                        # if species.last_moved_direction in remaining_directions:
+                        #    remaining_directions.remove(
+                        #        species.last_moved_direction)
 
-                        new_direction = directions_spec[0]
+                        if species.last_moved_direction == 'N' and 'S' in remaining_directions:
+                            remaining_directions.remove('S')
+                        elif species.last_moved_direction == 'S' and 'N' in remaining_directions:
+                            remaining_directions.remove('N')
+                        elif species.last_moved_direction == 'W' and 'E' in remaining_directions:
+                            remaining_directions.remove('E')
+                        elif species.last_moved_direction == 'E' and 'W' in remaining_directions:
+                            remaining_directions.remove('W')
+
+                        # Remove all directions where the species goes off the grid
+                        possible_directions = []
+                        for direction in remaining_directions:
+                            row_change, col_change = World.directions_to_location_change[direction]
+                            new_location = row_index + row_change, col_index + col_change
+                            if self.is_valid_location(new_location):
+                                possible_directions.append(direction)
+                            remaining_directions = possible_directions
+                            # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
+                                # print((row_index,col_index), remaining_directions)
+
+                        # 3) Figure out the best direction the species can move (according to its vision)
+                        current_location = row_index, col_index
+                        new_direction = self.decide_direction(species, current_location, remaining_directions)
+                        
+                        # 4) Set this as the species' last moved direction, and make a move in this direction
                         species.last_moved_direction = new_direction
+                        # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
+                            # print((row_index,col_index),new_direction, remaining_directions)
+                        row_change, col_change = World.directions_to_location_change[new_direction]
 
-                        match new_direction:
-                            case 'N':
-                                self.add_species_to_grid(
-                                    species, row_index - 1, col_index)
-                            case 'S':
-                                self.add_species_to_grid(
-                                    species, row_index + 1, col_index)
-                            case 'W':
-                                self.add_species_to_grid(
-                                    species, row_index, col_index - 1)
-                            case 'E':
-                                self.add_species_to_grid(
-                                    species, row_index, col_index + 1)
+                        self.add_species_to_grid(
+                            species, row_index + row_change, col_index + col_change)
 
                         location.species_list.remove(species)
                         moved_species.append(species.id)
@@ -439,45 +631,63 @@ class World:
 
         for row in self.grid:
             for location in row:
-                if len(location.species_list) > 0 and len(
-                        location.food_list) > 0:
-                    aggression = [
-                        species.aggression for species in location.species_list]
-                    if all(aggr <= 1 for aggr in aggression):
+                if len(location.species_list) > 0 and len(location.food_list) > 0:
+                    if len(location.species_list) == 1:
                         for species in location.species_list:
-                            species.energy += len(location.food_list) / \
-                                len(location.species_list)
+                            species.energy += len(location.food_list)
                     else:
-                        winner_hawk_indices = [
-                            i for i, j in enumerate(aggression)if j == max(aggression)]
-                        if len(winner_hawk_indices) == 1:
-                            max_damage = max(
-                                [i for i in aggression if i < max(aggression)])
-                            if max_damage <= 1:
-                                max_damage = 0
+                        aggression = [
+                            species.aggression for species in location.species_list]
+                        if all(aggr <= 1 for aggr in aggression):
+                            for species in location.species_list:
+                                species.energy += len(location.food_list) / \
+                                    len(location.species_list)
                         else:
-                            max_damage = max(aggression)
-                        winner_hawk = location.species_list[random.sample(
-                            winner_hawk_indices, 1)].id
-                        for species in location.species_list:
-                            if species.aggression > 1:
-                                if species.id == winner_hawk:
-                                    species.energy += len(location.food_list)
-                                    species.energy -= max_damage / 2
-                                else:
-                                    species.energy -= species.aggression / 2
+                            winner_hawk_indices = [
+                                i for i, j in enumerate(aggression)if j == max(aggression)]
+                            if len(winner_hawk_indices) == 1:
+                                max_damage = max(
+                                    [i for i in aggression if i < max(aggression)])
+                                if max_damage <= 1:
+                                    max_damage = 0
+                            else:
+                                max_damage = max(aggression)
+                            winner_hawk = location.species_list[random.sample(
+                                winner_hawk_indices, 1)[0]].id
+                            for species in location.species_list:
+                                if species.aggression > 1:
+                                    if species.id == winner_hawk:
+                                        species.energy += len(location.food_list)
+                                        species.energy -= max_damage / 2
+                                    else:
+                                        species.energy -= species.aggression / 2
                     location.food_list = []
+
+    def species_hibernate(self) -> None:
+        """
+        At the beginning of each day each creature may hibernate with a probability proportional to its size
+        """
+        for row in self.grid:
+            for location in row:
+                for species in location.species_list:
+                    hibernation_risk = (species.size - 1)/2
+                    hibernate = random.random() < hibernation_risk
+                    species.hibernate = hibernate
 
     def species_lose_energy(self) -> None:
         """
         Each species loses a set amount of energy at the end of every day. 
+        This energy loss is proportional to the square of the speed of the species.
+        Species lose an additional amount of energy proportional to their vision trait 
         """
 
-        energy_loss = constants.ENERGY_LOSS
+        energy_loss_base = constants.ENERGY_LOSS
 
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
+                    energy_loss = (species.speed**2) * energy_loss_base
+                    energy_loss += ((species.vision) * energy_loss_base)/2
                     species.energy -= energy_loss
 
     def species_reproduce(self) -> None:
@@ -498,7 +708,7 @@ class World:
                         # Add random mutation to generate child's trait values
                         child_traits = Species.get_child_traits(
                             parent_traits, self.mutation_rates)
-
+                        # print(child_traits)
                         # Generate a child from these trait values
                         location.add_species(Species(
                             size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))

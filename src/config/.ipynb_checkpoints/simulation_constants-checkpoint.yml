@@ -4,7 +4,7 @@ NUM_INITIAL_SPECIES_FRACTION: 0.1
 
 # Number of moving and feeding actions made per day
 # NUM_ACTIONS_PER_DAY = MAX_SPEED x SPEED_MODIFIER (@Atreyi what is max speed? Should this be defined in this file?)
-NUM_ACTIONS_PER_DAY: 30
+NUM_ACTIONS_PER_DAY: 100
 
 # Controls the probability of food being generated at a given location 
 FOOD_PROBABILITY_SCALAR: 0.1
@@ -13,8 +13,8 @@ FOOD_PROBABILITY_STD: 10
 # The temperature in which the most food is produced 
 OPTIMAL_TEMPERATURE: 10
 
-# @Atreyi: to explain 
-SPEED_MODIFIER: 10
+# @Atreyi: choosing a different metric without a speed modifier here, expalined in more detail in world.py
+MAXIMUM_SPEED: 50
 
 # Initial energy of a species during *initial* population (not during reproduction)
 INITIAL_ENERGY: 5
@@ -25,7 +25,7 @@ ENERGY_LOSS: 0.5
 # Initial trait values 
 INITIAL_SIZE: 1
 INITIAL_SPEED: 1
-INITIAL_VISION: 1
+INITIAL_VISION: 0
 INITIAL_AGGRESSION: 1
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
