@@ -751,8 +751,13 @@ class World:
                         winner_hawk_indices = [
                             i for i, j in enumerate(aggression)if j == max(aggression)]
                         if len(winner_hawk_indices) == 1:
-                            max_damage = max(
-                                [i for i in aggression if i < max(aggression)])
+                            # @Atreyi to check
+                            aggression_list = [
+                                i for i in aggression if i < max(aggression)]
+                            if len(aggression_list) == 0:
+                                max_damage = 0
+                            else:
+                                max_damage = max(aggression_list)
                             if max_damage <= 1:
                                 max_damage = 0
                         else:
