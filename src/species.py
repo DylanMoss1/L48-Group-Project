@@ -1,6 +1,6 @@
 from typing import Dict
 import constants
-import random
+from numpy.random import normal
 
 # Generate unique species IDs
 
@@ -14,7 +14,6 @@ def get_new_species_id() -> int:
     return species_id - 1
 
 # Collect relevant constants
-
 
 initial_size = constants.INITIAL_SIZE
 initial_speed = constants.INITIAL_SPEED
@@ -98,7 +97,7 @@ class Species:
                       "vision": None, "aggression": None}
 
         for key, value in original_traits.items():
-            new_traits[key] = random.normal(
+            new_traits[key] = normal(
                 loc=value, scale=mutation_rates[key])
 
         return new_traits

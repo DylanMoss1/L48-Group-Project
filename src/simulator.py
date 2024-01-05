@@ -25,6 +25,7 @@ class Simulator(ABC):
             Length of each size of the simulation grid
         """
         self.world = World(grid_length_size)
+        self.grid_length_size = grid_length_size
 
     def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
         """

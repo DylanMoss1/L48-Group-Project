@@ -8,6 +8,7 @@ from tabulate import tabulate
 from termcolor import colored
 import constants
 from dataclasses import dataclass
+from numpy.random import normal
 
 
 class Location:
@@ -402,13 +403,13 @@ class World:
         for species_x, species_y in species_location_set:
 
             # Add new species instances at every location in the set
-            size = random.normal(
+            size = normal(
                 loc=mutation_start_point["size"][0], scale=mutation_start_point["size"][1])
-            speed = random.normal(
+            speed = normal(
                 loc=mutation_start_point["speed"][0], scale=mutation_start_point["speed"][1])
-            vision = random.normal(
+            vision = normal(
                 loc=mutation_start_point["vision"][0], scale=mutation_start_point["vision"][1])
-            aggression = random.normal(
+            aggression = normal(
                 loc=mutation_start_point["aggression"][0], scale=mutation_start_point["aggression"][1])
 
             self.grid[species_y][species_x].add_species(
@@ -588,7 +589,7 @@ class World:
             currently_observed_location = currently_observed_row_index, currently_observed_col_index
 
             if self.is_valid_location(currently_observed_location) and self.is_food_at_location(currently_observed_location):
-                food_locations.append(currently_observed_location)
+                food_locations.append(direction)
 
         return food_locations
 
@@ -628,7 +629,7 @@ class World:
         current_species_row_index, current_species_col_index = species_location
 
         # Look {vision // 1} spaces in all possible directions
-        for current_vision in range(1, vision + 1):
+        for current_vision in range(1, math.floor(vision + 1)):
 
             food_locations = self.food_locations_found_in_vision(
                 possible_directions, current_species_row_index, current_species_col_index, current_vision)
