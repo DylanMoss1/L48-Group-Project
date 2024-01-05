@@ -148,6 +148,12 @@ class World:
         'E': (0, 1),
         'W': (0, -1),
     }
+    opposite_direction = {
+        'N': 'S',
+        'S': 'N',
+        'E': 'W',
+        'W': 'E',
+    }
 
     def __init__(self, grid_length_size) -> None:
         """
@@ -256,8 +262,8 @@ class World:
         self.populate_grid()
         self.day = 0
 
-        self.set_mutation_rates(self, mutation_rates)
-        return self.run_simulation_loop(self, debug_info, max_days)
+        self.set_mutation_rates(mutation_rates)
+        return self.run_simulation_loop(debug_info, max_days)
 
     def run_from_start_point(self, mutation_rates, day_start_point, population_start_point, mutation_start_point, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
         """
@@ -304,8 +310,8 @@ class World:
             population_start_point, mutation_start_point)
         self.day = day_start_point
 
-        self.set_mutation_rates(self, mutation_rates)
-        return self.run_simulation_loop(self, debug_info, max_days)
+        self.set_mutation_rates(mutation_rates)
+        return self.run_simulation_loop(debug_info, max_days)
 
     def debug(self, debug_info) -> None:
         """
@@ -498,7 +504,6 @@ class World:
         col_index : int 
             Index of grid col where the species should be added 
         """
-
         self.grid[row_index][col_index].add_species(species)
 
     def is_valid_location(self, location) -> bool:
@@ -516,7 +521,7 @@ class World:
             Is true if a given location (in form (row_index, col_index)) is within the boundaries of the grid  
         """
 
-        col_index, row_index = location
+        row_index, col_index = location
 
         if col_index < 0 or col_index >= self.grid_length_size:
             return False
@@ -526,7 +531,28 @@ class World:
 
         return True
 
-    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> list(str):
+    def is_food_at_location(self, location) -> bool:
+        """ 
+        Returns true if there is food on the grid at a given location
+
+        Parameters
+        ----------
+        location : (int, int)
+            Location represented in form (row_index, col_index)
+
+        Returns 
+        -------
+        is_food : bool 
+            Is true if a given location (in form (row_index, col_index)) on the grid contains food 
+        """
+
+        row_index, col_index = location
+        food_list_at_location = self.grid[row_index][col_index].food_list
+        is_food = len(food_list_at_location) > 0
+
+        return is_food
+
+    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
         """
         Returns a list of all locations (in form (row_index, col_index)) of food found with a set vision. 
         Note that we only look at positions EXACTLY as far as the vision, not any less than the vision.
@@ -629,7 +655,7 @@ class World:
 
         For all species 
         - 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
-        - 2) Determine what directions it can move in (not off the grid, and not the previously moved direction)
+        - 2) Determine what directions it can move in (not off the grid, and not towards the previously moved direction)
         - 3) Figure out the best direction the species can move (according to its vision)
         - 4) Set this as the species' last moved direction, and make a move in this direction
 
@@ -664,23 +690,29 @@ class World:
                     # 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
                     if able_to_move and not has_previously_moved:
 
-                        # 2) Determine what directions it can move in (not off the grid, and not the previously moved direction)
+                        # 2) Determine what directions it can move in (not off the grid, and not towards the previously moved direction)
                         remaining_directions = World.directions.copy()
 
                         # Remove previously moved direction
                         if species.last_moved_direction in remaining_directions:
-                            remaining_directions.remove(
-                                species.last_moved_direction)
+                            remaining_directions.remove(World.opposite_direction[
+                                species.last_moved_direction])
+
+                        invalid_directions = []
 
                         # Remove all directions where the species goes off the grid
                         for direction in remaining_directions:
                             row_change, col_change = World.directions_to_location_change[direction]
 
-                            if not self.is_valid_location(row_index + row_change, col_index + col_change):
-                                remaining_directions.remove(direction)
+                            if not self.is_valid_location((row_index + row_change, col_index + col_change)):
+                                invalid_directions.append(direction)
+
+                        for direction in invalid_directions:
+                            remaining_directions.remove(direction)
 
                         # 3) Figure out the best direction the species can move (according to its vision)
                         new_direction = self.decide_direction(
+                            species, (row_index, col_index),
                             remaining_directions)
 
                         # 4) Set this as the species' last moved direction, and make a move in this direction
