@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from species import Species
 from food import Food
 import math
@@ -112,6 +112,8 @@ class LogItem:
     """
     day: int
     num_species_alive: int
+    births: int
+    deaths: int
     temperature: float
     probability_of_food: float
     traits_dict: Dict[str, List[float]]
@@ -224,7 +226,21 @@ class World:
 
         log = []
         is_extinct = False
-
+        if starting_situation is not None:
+            trait_distribution = None
+            for key, value in starting_situation.items():
+                match key:
+                    case "population":
+                        self.num_initial_species = value
+                    case "days":
+                        self.day = value
+                    case "trait_distribution":
+                        trait_distribution = value
+            self.grid = [
+                [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
+            ]
+            self.populate_grid(trait_distribution=trait_distribution)
+            
         while not is_extinct:
             self.day += 1
 
@@ -366,20 +382,26 @@ class World:
             self.species_consume_food()
 
         self.species_lose_energy()
-        self.species_reproduce()
+        births = self.species_reproduce()
 
-        num_species_alive = self.species_die()
+        num_species_alive, deaths = self.species_die()
 
-        log_item = LogItem(self.day, num_species_alive,
+        log_item = LogItem(self.day, num_species_alive, births, deaths,
                            temperature, probability_of_food, traits_dict)
 
         is_extinct = num_species_alive == 0
 
         return is_extinct, log_item
 
-    def populate_grid(self) -> None:
+    def populate_grid(self, trait_distribution: Dict[str, Dict[str, float]]=None) -> None:
         """
         Fill self.grid with self.num_inital_species number of initial species.
+        
+        Parameters
+        ----------
+        trait_distribution : optional(dict(string, dict(str, float)))
+            Contains keys: size, speed, vision, aggression
+            With corresponding values representing dictionaries containing the mean and variance of each trait
         """
 
         species_location_set = set()  # Using sets so that locations are unique
@@ -607,13 +629,9 @@ class World:
             currently_observed_location = currently_observed_row_index, currently_observed_col_index
 
             if self.is_valid_location(currently_observed_location) and self.is_food_at_location(currently_observed_location):
-                food_directions.append(direction)
+                food_directions.append(currently_observed_location)
 
         return food_directions
-
-    def is_food_at_location(self, currently_observed_location) -> bool:
-        row_index, col_index = currently_observed_location
-        return len(self.grid[row_index][col_index].food_list) > 0
 
     def decide_direction(self, species, species_location, possible_directions) -> str:
         """
@@ -823,13 +841,19 @@ class World:
                     maximum_stored_energy = constants.INITIAL_ENERGY + species.size
                     species.energy = min(species.energy, maximum_stored_energy)
 
-    def species_reproduce(self) -> None:
+    def species_reproduce(self) -> int:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
+        
+        Returns
+        -------
+        num_births : int
+            The number of new species that have been produced this timestep
         """
 
         reproduction_threshold = constants.REPRODUCTION_THRESHOLD
 
+        num_births = 0
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
@@ -845,8 +869,10 @@ class World:
                         # Generate a child from these trait values
                         location.add_species(Species(
                             size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))
+                        num_births += 1
+        return num_births
 
-    def species_die(self) -> bool:
+    def species_die(self) -> Tuple[int, int]:
         """
         If any species has less than or equal to 0 energy, they die.
 
@@ -854,20 +880,23 @@ class World:
         -------
         num_species_alive : int
             The number of species that are still alive in the simulation World
+        num_deaths: int
+            The number of species that have died this timestep
         """
 
         num_alive_species = 0  # Calculated like this for the logs
-
+        num_deaths = 0
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
                     if species.energy <= 0:
                         species.death = True
                         location.species_list.remove(species)
+                        num_deaths += 1
                     else:
                         num_alive_species += 1
 
-        return num_alive_species
+        return num_alive_species, num_deaths
 
     def pprint(self, display_grid=True, display_traits=True) -> None:
         """
