@@ -70,6 +70,6 @@ def graph_histogram(
         fig.savefig(save_location)
 
 
-# results = run_simulator(5)
-results = pd.read_csv("./tests/1-1-1-1-5.csv")
+results = run_simulator(5)
+# results = pd.read_csv("./tests/1-1-1-1-5.csv")
 graph_histogram(results)
