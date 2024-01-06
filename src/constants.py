@@ -3,7 +3,7 @@ from pathlib import Path
 
 # Parse simulation_constants.yml as a python dictionary
 simulation_constants = yaml.safe_load(
-    Path('src/config/simulation_constants.yml').read_text())
+    Path('config/simulation_constants.yml').read_text())
 
 # Assign dictionary contents to python constant variables
 
