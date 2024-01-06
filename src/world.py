@@ -636,7 +636,8 @@ class World:
         """
         Each species loses a set amount of energy at the end of every day. 
         This energy loss is proportional to the square of the speed of the species.
-        Species lose an additional amount of energy proportional to their vision trait 
+        Species lose an additional amount of energy proportional to their vision trait
+        Maximum energy is capped at a value that increases with the size of the species 
         """
 
         energy_loss_base = constants.ENERGY_LOSS
@@ -647,6 +648,8 @@ class World:
                     energy_loss = (species.speed**2) * energy_loss_base
                     energy_loss += ((species.vision) * energy_loss_base)/2
                     species.energy -= energy_loss
+                    maximum_stored_energy = constants.INITIAL_ENERGY + species.size
+                    species.energy = min(species.energy, maximum_stored_energy)
 
     def species_reproduce(self) -> None:
         """
