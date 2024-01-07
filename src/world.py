@@ -72,6 +72,8 @@ class DebugInfo:
         The number of days to wait before printing debug info (default is 1)
     should_display_day : bool 
         Should display the current day of the simulation (default is False)
+    should_display_action : bool 
+        Should display the number of actions taken so far that day (default is False)
     should_display_grid : bool 
         Should the grid state be printed in the debug info (default is False) 
     should_display_traits : bool
@@ -79,6 +81,7 @@ class DebugInfo:
     """
     period: int = 1
     should_display_day: bool = False
+    should_display_action: bool = False
     should_display_grid: bool = False
     should_display_traits: bool = False
 
@@ -230,7 +233,7 @@ class World:
                     self.day -= 1
                     break
 
-            is_extinct, log_item = self.compute_timestep()
+            is_extinct, log_item = self.compute_timestep(debug_info)
             log.append(log_item)
             self.debug(debug_info)
 
@@ -331,9 +334,14 @@ class World:
             self.pprint(debug_info.should_display_grid,
                         debug_info.should_display_traits)
 
-    def compute_timestep(self) -> None:
+    def compute_timestep(self, debug_info) -> None:
         """
         Perform a timestep (that is process 1 day) of the World simulation.
+
+        Parameters
+        ----------
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
 
         Returns 
         -------
@@ -348,6 +356,12 @@ class World:
         self.species_hibernate()
 
         for action_number in range(self.num_actions_per_day):
+            if debug_info.should_display_action:
+                print("Action number:", action_number)
+
+                self.pprint(debug_info.should_display_grid,
+                            debug_info.should_display_traits)
+
             self.species_move(action_number)
             self.species_consume_food()
 
@@ -433,7 +447,8 @@ class World:
             }
         """
 
-        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": [], "energy": []}
+        traits_dict = {"size": [], "speed": [],
+                       "vision": [], "aggression": [], "energy": []}
 
         for row in self.grid:
             for location in row:
@@ -556,9 +571,9 @@ class World:
 
         return is_food
 
-    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
+    def food_directions_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
         """
-        Returns a list of all locations (in form (row_index, col_index)) of food found with a set vision. 
+        Returns a list of all directions (i.e. "N", "S", "E", or "W") of food found with a set vision. 
         Note that we only look at positions EXACTLY as far as the vision, not any less than the vision.
 
         Parameters
@@ -575,10 +590,10 @@ class World:
         Returns
         -------
         food_locations : list(str)
-            List of all locations containing food found with the set vision 
+            List of all directions containing food found with the set vision 
         """
 
-        food_locations = []
+        food_directions = []
 
         for direction in possible_directions:
 
@@ -592,9 +607,9 @@ class World:
             currently_observed_location = currently_observed_row_index, currently_observed_col_index
 
             if self.is_valid_location(currently_observed_location) and self.is_food_at_location(currently_observed_location):
-                food_locations.append(direction)
+                food_directions.append(direction)
 
-        return food_locations
+        return food_directions
 
     def is_food_at_location(self, currently_observed_location) -> bool:
         row_index, col_index = currently_observed_location
@@ -638,43 +653,24 @@ class World:
         # Look {vision // 1} spaces in all possible directions
         for current_vision in range(1, math.floor(vision) + 1):
 
-            food_locations = self.food_locations_found_in_vision(
+            food_directions = self.food_directions_found_in_vision(
                 possible_directions, current_species_row_index, current_species_col_index, current_vision)
 
             # Return the closest food found
             # Ties broken randomly
-            if len(food_locations) > 0:
-                food_choice = random.choice(food_locations)
-                row_index, col_index = food_choice
-                # print(food_choice,species_location)
-                if row_index < current_species_row_index:
-                    return 'N'
-                elif row_index > current_species_row_index:
-                    return 'S'
-                elif col_index < current_species_col_index:
-                    return 'W'
-                elif col_index > current_species_col_index:
-                    return 'E'
+            if len(food_directions) > 0:
+                return random.choice(food_directions)
 
         # If no food found so far...
         # Look {vision // 1} + 1 spaces in all possible directions
-        food_locations = self.food_locations_found_in_vision(
+        food_directions = self.food_directions_found_in_vision(
             possible_directions, current_species_row_index, current_species_col_index, current_vision=math.floor(vision) + 1)
 
         # If food found, move towards food with (vision - vision // 1) probability -- that is with probability U[0, 1] < (vision % 1)
-        if len(food_locations) > 0 and random.random() < (vision % 1):
-            food_choice = random.choice(food_locations)
-            row_index, col_index = food_choice
-            # print(food_choice,species_location)
-            if row_index < current_species_row_index:
-                return 'N'
-            elif row_index > current_species_row_index:
-                return 'S'
-            elif col_index < current_species_col_index:
-                return 'W'
-            elif col_index > current_species_col_index:
-                return 'E'
-        return random.choice(possible_directions)
+        if len(food_directions) > 0 and random.random() < (vision % 1):
+            return random.choice(food_directions)
+        else:
+            return random.choice(possible_directions)
 
     def species_move(self, action_number) -> None:
         """
@@ -682,7 +678,7 @@ class World:
 
         For all species 
         - 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
-        - 2) Determine what directions it can move in (not off the grid, and not towards the previously moved direction)
+        - 2) Determine what directions it can move in (not off the grid) ##, and not towards the previously moved direction) <- food spawns more regularly than creature movement, so this is removed
         - 3) Figure out the best direction the species can move (according to its vision)
         - 4) Set this as the species' last moved direction, and make a move in this direction
 
@@ -717,18 +713,19 @@ class World:
                     # 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
                     if able_to_move and not has_previously_moved:
 
-                        # 2) Determine what directions it can move in (not off the grid, and not towards the previously moved direction)
+                        # 2) Determine what directions it can move in (not off the grid ## , and not towards the previously moved direction) <- food spawns more regularly than creature movement, so this is removed
                         remaining_directions = World.directions.copy()
 
-                        # Remove previously moved direction
-                        if species.last_moved_direction in remaining_directions:
-                            remaining_directions.remove(World.opposite_direction[
-                                species.last_moved_direction])
+                        # food spawns more regularly than creature movement, so this is removed
+
+                        # # Remove previously moved direction
+                        # if species.last_moved_direction in remaining_directions:
+                        #     remaining_directions.remove(World.opposite_direction[
+                        #         species.last_moved_direction])
 
                         invalid_directions = []
 
                         # Remove all directions where the species goes off the grid
-                        possible_directions = []
                         for direction in remaining_directions:
                             row_change, col_change = World.directions_to_location_change[direction]
 
@@ -745,8 +742,7 @@ class World:
 
                         # 4) Set this as the species' last moved direction, and make a move in this direction
                         species.last_moved_direction = new_direction
-                        # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
-                            # print((row_index,col_index),new_direction, remaining_directions)
+
                         row_change, col_change = World.directions_to_location_change[new_direction]
 
                         self.add_species_to_grid(
