@@ -8,6 +8,7 @@ from tabulate import tabulate
 from termcolor import colored
 import constants
 from dataclasses import dataclass
+from numpy.random import normal
 
 
 class Location:
@@ -71,6 +72,8 @@ class DebugInfo:
         The number of days to wait before printing debug info (default is 1)
     should_display_day : bool 
         Should display the current day of the simulation (default is False)
+    should_display_action : bool 
+        Should display the number of actions taken so far that day (default is False)
     should_display_grid : bool 
         Should the grid state be printed in the debug info (default is False) 
     should_display_traits : bool
@@ -78,6 +81,7 @@ class DebugInfo:
     """
     period: int = 1
     should_display_day: bool = False
+    should_display_action: bool = False
     should_display_grid: bool = False
     should_display_traits: bool = False
 
@@ -148,6 +152,12 @@ class World:
         'E': (0, 1),
         'W': (0, -1),
     }
+    opposite_direction = {
+        'N': 'S',
+        'S': 'N',
+        'E': 'W',
+        'W': 'E',
+    }
 
     def __init__(self, grid_length_size) -> None:
         """
@@ -165,28 +175,10 @@ class World:
         self.grid = [
             [Location() for _ in range(self.grid_length_size)] for _ in range(self.grid_length_size)
         ]
-        self.populate_grid()
 
-    def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
+    def set_mutation_rates(self, mutation_rates) -> None:
         """
-        Run the World simulation with given mutation rates until the species goes extinct. 
-
-        Parameters
-        ----------
-        mutation_rates : dict(string, int)
-            Contains keys: size, speed, vision, aggression. 
-            With corresponding values representing the mutation rates for each trait 
-        debug_info : DebugInfo 
-            Determines how much information should be printed to the console during the program's execution (default is no debug info)
-        max_days : optional(int)
-            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
-
-        Returns 
-        -------
-        days_survived : int 
-            The number of days the species has survived until extinction 
-        log : list(LogItem)
-            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+        Set the mutation rate values of the World instance. 
 
         Attributes 
         ----------
@@ -211,7 +203,25 @@ class World:
             "aggression": mutation_rates["aggression"]
         }
 
-        self.day = 0
+    def run_simulation_loop(self, debug_info=DebugInfo(), max_days=None):
+        """
+        Run the World simulation until the species goes extinct. 
+
+        Parameters
+        ----------
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
+
+        Returns 
+        -------
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+        """
+
         log = []
         is_extinct = False
 
@@ -223,13 +233,89 @@ class World:
                     self.day -= 1
                     break
 
-            is_extinct, log_item = self.compute_timestep()
+            is_extinct, log_item = self.compute_timestep(debug_info)
             log.append(log_item)
             self.debug(debug_info)
 
         days_survived = self.day
 
         return days_survived, log
+
+    def run(self, mutation_rates, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
+        """
+        Run the World simulation with given mutation rates until the species goes extinct. 
+
+        Parameters
+        ----------
+        mutation_rates : dict(string, int)
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values representing the mutation rates for each trait 
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
+
+        Returns 
+        -------
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+        """
+
+        self.populate_grid()
+        self.day = 0
+
+        self.set_mutation_rates(mutation_rates)
+        return self.run_simulation_loop(debug_info, max_days)
+
+    def run_from_start_point(self, mutation_rates, day_start_point, population_start_point, mutation_start_point, debug_info=DebugInfo(), max_days=None) -> (int, List[LogItem]):
+        """
+        Run the World simulation from a start point with given mutation rates until the species goes extinct. 
+        The current day, population and mean + std of each mutation trait are given for the start point. 
+
+        Parameters
+        ----------
+        mutation_rates : dict(string, int)
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values representing the mutation rates for each trait 
+        day_start_point : int 
+            The day in which the simulation starts from (assert that 0 <= day_start_point and day_start_point < max_days if max_days is not None)
+        population_start_point : int 
+            The population at the simulation start point (assert that 0 <= population_start_point <= (self.grid_length_size ** 2))        
+        mutation_start_point : dict(string, (int, int))
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values (mean, std) for the current mean and std of each trait
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
+        max_days : optional(int)
+            If not None, this is the maximum number of days the simulation can run for before being automatically terminated (default is None)
+
+        Returns 
+        -------
+        days_survived : int 
+            The number of days the species has survived until extinction 
+        log : list(LogItem)
+            A list of log item entries (important values for emulation training: see LogItem) made throughout the simulation's execution
+
+        Attributes 
+        ----------
+        size_mutation_rate : int 
+            Mutation rate for species size: size_{t+1} = N(size_t, size_mutation_rate)
+        speed_mutation_rate : int 
+            Mutation rate for species speed: speed_{t+1} = N(speed_t, speed_mutation_rate)
+        vision_mutation_rate : int 
+            Mutation rate for species vision: vision_{t+1} = N(vision_t, vision_mutation_rate)
+        aggression_mutation_rate : int 
+            Mutation rate for species aggression: aggression_{t+1} = N(aggression_t, aggression_mutation_rate)
+        """
+
+        self.populate_grid_from_start_point(
+            population_start_point, mutation_start_point)
+        self.day = day_start_point
+
+        self.set_mutation_rates(mutation_rates)
+        return self.run_simulation_loop(debug_info, max_days)
 
     def debug(self, debug_info) -> None:
         """
@@ -248,9 +334,14 @@ class World:
             self.pprint(debug_info.should_display_grid,
                         debug_info.should_display_traits)
 
-    def compute_timestep(self) -> None:
+    def compute_timestep(self, debug_info) -> None:
         """
         Perform a timestep (that is process 1 day) of the World simulation.
+
+        Parameters
+        ----------
+        debug_info : DebugInfo 
+            Determines how much information should be printed to the console during the program's execution (default is no debug info)
 
         Returns 
         -------
@@ -265,13 +356,20 @@ class World:
         self.species_hibernate()
         
         for action_number in range(self.num_actions_per_day):
+            if debug_info.should_display_action:
+                # print("Action number:", action_number)
+
+                self.pprint(debug_info.should_display_grid,
+                            debug_info.should_display_traits)
+
             self.species_move(action_number)
             self.species_consume_food()
-            self.species_reproduce()
             
         self.species_lose_energy()
-        num_species_alive = self.species_die()
+        self.species_reproduce()
 
+        num_species_alive = self.species_die()
+        # print("Current population:", num_species_alive)
         log_item = LogItem(self.day, num_species_alive,
                            temperature, probability_of_food, traits_dict)
 
@@ -296,6 +394,43 @@ class World:
             # Add new species instances at every location in the set
             self.grid[species_y][species_x].add_species(Species())
 
+    def populate_grid_from_start_point(self, population_start_point, mutation_start_point) -> None:
+        """
+        Fill self.grid with population_start_point number of initial species.
+        The mutations of these species are described by the mean and std in mutation_start_point
+
+        Parameters
+        ----------
+        population_start_point : int 
+            The population at the simulation start point (assert that 0 <= population_start_point <= (self.grid_length_size ** 2))        
+        mutation_start_point : dict(string, (int, int))
+            Contains keys: size, speed, vision, aggression. 
+            With corresponding values (mean, std) for the current mean and std of each trait
+        """
+
+        species_location_set = set()  # Using sets so that locations are unique
+
+        # Keep adding locations until the set contains 4 unique locations
+        while len(species_location_set) < population_start_point:
+            random_tuple = (random.randint(0, self.grid_length_size - 1),
+                            random.randint(0, self.grid_length_size - 1))
+            species_location_set.add(random_tuple)
+
+        for species_x, species_y in species_location_set:
+
+            # Add new species instances at every location in the set
+            size = normal(
+                loc=mutation_start_point["size"][0], scale=mutation_start_point["size"][1])
+            speed = normal(
+                loc=mutation_start_point["speed"][0], scale=mutation_start_point["speed"][1])
+            vision = normal(
+                loc=mutation_start_point["vision"][0], scale=mutation_start_point["vision"][1])
+            aggression = normal(
+                loc=mutation_start_point["aggression"][0], scale=mutation_start_point["aggression"][1])
+
+            self.grid[species_y][species_x].add_species(
+                Species(size=size, speed=speed, vision=vision, aggression=aggression))
+
     def get_traits_of_living_species(self) -> Dict[str, List[float]]:
         """
         Returns each trait of all living species in list form, accessible through a dictionary. 
@@ -312,7 +447,8 @@ class World:
             }
         """
 
-        traits_dict = {"size": [], "speed": [], "vision": [], "aggression": [], "energy": []}
+        traits_dict = {"size": [], "speed": [],
+                       "vision": [], "aggression": [], "energy": []}
 
         for row in self.grid:
             for location in row:
@@ -339,7 +475,7 @@ class World:
             Temperature on the current day
         """
 
-        return 8 - 18 * math.cos(2 * math.pi * self.day / 365) + 0.19 * (self.day / (365 * 10))
+        return 8 - 18 * math.cos(2 * math.pi * (self.day + 100) / 365) + 0.19 * (self.day / (365 * 10))
 
     def add_food_to_grid(self) -> None:
         """
@@ -365,13 +501,13 @@ class World:
         temperature = self.compute_temperature()
 
         probability_of_food = scalar * \
-            math.exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
+            math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
         for row in self.grid:
             for location in row:
                 if random.random() < probability_of_food:
                     location.add_food()
-
+        print("Food generation likelihood:", probability_of_food)
         return temperature, probability_of_food
 
     def add_species_to_grid(self, species, row_index, col_index) -> None:
@@ -387,7 +523,6 @@ class World:
         col_index : int 
             Index of grid col where the species should be added 
         """
-
         self.grid[row_index][col_index].add_species(species)
 
     def is_valid_location(self, location) -> bool:
@@ -405,7 +540,7 @@ class World:
             Is true if a given location (in form (row_index, col_index)) is within the boundaries of the grid  
         """
 
-        col_index, row_index = location
+        row_index, col_index = location
 
         if col_index < 0 or col_index >= self.grid_length_size:
             return False
@@ -415,9 +550,30 @@ class World:
 
         return True
 
-    def food_locations_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
+    def is_food_at_location(self, location) -> bool:
+        """ 
+        Returns true if the given location (in form (row_index, col_index)) contains food.
+
+        Parameters
+        ----------
+        location : (int, int)
+            Location represented in form (row_index, col_index)
+
+        Returns 
+        -------
+        is_food : bool 
+            Is true if a given location (in form (row_index, col_index)) on the grid contains food 
         """
-        Returns a list of all locations (in form (row_index, col_index)) of food found with a set vision. 
+
+        row_index, col_index = location
+        food_list_at_location = self.grid[row_index][col_index].food_list
+        is_food = len(food_list_at_location) > 0
+
+        return is_food
+
+    def food_directions_found_in_vision(self, possible_directions, current_species_row_index, current_species_col_index, current_vision) -> List[str]:
+        """
+        Returns a list of all directions (i.e. "N", "S", "E", or "W") of food found with a set vision. 
         Note that we only look at positions EXACTLY as far as the vision, not any less than the vision.
 
         Parameters
@@ -434,10 +590,10 @@ class World:
         Returns
         -------
         food_locations : list(str)
-            List of all locations containing food found with the set vision 
+            List of all directions containing food found with the set vision 
         """
 
-        food_locations = []
+        food_directions = []
 
         for direction in possible_directions:
 
@@ -451,9 +607,9 @@ class World:
             currently_observed_location = currently_observed_row_index, currently_observed_col_index
 
             if self.is_valid_location(currently_observed_location) and self.is_food_at_location(currently_observed_location):
-                food_locations.append(currently_observed_location)
+                food_directions.append(direction)
 
-        return food_locations
+        return food_directions
 
     def is_food_at_location(self, currently_observed_location) -> bool:
         row_index, col_index = currently_observed_location
@@ -497,43 +653,24 @@ class World:
         # Look {vision // 1} spaces in all possible directions
         for current_vision in range(1, math.floor(vision) + 1):
 
-            food_locations = self.food_locations_found_in_vision(
+            food_directions = self.food_directions_found_in_vision(
                 possible_directions, current_species_row_index, current_species_col_index, current_vision)
 
             # Return the closest food found
             # Ties broken randomly
-            if len(food_locations) > 0:
-                food_choice = random.choice(food_locations)
-                row_index, col_index = food_choice
-                # print(food_choice,species_location)
-                if row_index < current_species_row_index:
-                    return 'N'
-                elif row_index > current_species_row_index:
-                    return 'S'
-                elif col_index < current_species_col_index:
-                    return 'W'
-                elif col_index > current_species_col_index:
-                    return 'E'
+            if len(food_directions) > 0:
+                return random.choice(food_directions)
 
         # If no food found so far...
         # Look {vision // 1} + 1 spaces in all possible directions
-        food_locations = self.food_locations_found_in_vision(
-            possible_directions, current_species_row_index, current_species_col_index, current_vision=1)
+        food_directions = self.food_directions_found_in_vision(
+            possible_directions, current_species_row_index, current_species_col_index, current_vision=math.floor(vision) + 1)
 
         # If food found, move towards food with (vision - vision // 1) probability -- that is with probability U[0, 1] < (vision % 1)
-        if len(food_locations) > 0 and random.random() < (vision % 1):
-            food_choice = random.choice(food_locations)
-            row_index, col_index = food_choice
-            # print(food_choice,species_location)
-            if row_index < current_species_row_index:
-                return 'N'
-            elif row_index > current_species_row_index:
-                return 'S'
-            elif col_index < current_species_col_index:
-                return 'W'
-            elif col_index > current_species_col_index:
-                return 'E'
-        return random.choice(possible_directions)
+        if len(food_directions) > 0 and random.random() < (vision % 1):
+            return random.choice(food_directions)
+        else:
+            return random.choice(possible_directions)
 
     def species_move(self, action_number) -> None:
         """
@@ -541,7 +678,7 @@ class World:
 
         For all species 
         - 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
-        - 2) Determine what directions it can move in (not off the grid, and not the previously moved direction)
+        - 2) Determine what directions it can move in (not off the grid) ##, and not towards the previously moved direction) <- food spawns more regularly than creature movement, so this is removed
         - 3) Figure out the best direction the species can move (according to its vision)
         - 4) Set this as the species' last moved direction, and make a move in this direction
 
@@ -565,52 +702,47 @@ class World:
         for row_index, row in enumerate(self.grid):
             for col_index, location in enumerate(row):
                 for species in location.species_list:
-               
-                    slowness_factor = (int)(maximum_speed/species.speed)
-                    
-                    able_to_move = action_number % slowness_factor == 0 and (not species.hibernate)
+
+                    slowness_factor = (int)(maximum_speed/species.speed) + 1 if species.speed > 0 else -1
+
+                    able_to_move = action_number % slowness_factor == 0 and (
+                        not species.hibernate) and (slowness_factor != -1)
 
                     has_previously_moved = species.id in moved_species
 
                     # 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
                     if able_to_move and not has_previously_moved:
 
-                        # 2) Determine what directions it can move in (not off the grid, and not the previously moved direction)
+                        # 2) Determine what directions it can move in (not off the grid ## , and not towards the previously moved direction) <- food spawns more regularly than creature movement, so this is removed
                         remaining_directions = World.directions.copy()
 
-                        # Remove previously moved direction
-                        # if species.last_moved_direction in remaining_directions:
-                        #    remaining_directions.remove(
-                        #        species.last_moved_direction)
+                        # food spawns more regularly than creature movement, so this is removed
 
-                        if species.last_moved_direction == 'N' and 'S' in remaining_directions:
-                            remaining_directions.remove('S')
-                        elif species.last_moved_direction == 'S' and 'N' in remaining_directions:
-                            remaining_directions.remove('N')
-                        elif species.last_moved_direction == 'W' and 'E' in remaining_directions:
-                            remaining_directions.remove('E')
-                        elif species.last_moved_direction == 'E' and 'W' in remaining_directions:
-                            remaining_directions.remove('W')
+                        # # Remove previously moved direction
+                        # if species.last_moved_direction in remaining_directions:
+                        #     remaining_directions.remove(World.opposite_direction[
+                        #         species.last_moved_direction])
+
+                        invalid_directions = []
 
                         # Remove all directions where the species goes off the grid
-                        possible_directions = []
                         for direction in remaining_directions:
                             row_change, col_change = World.directions_to_location_change[direction]
-                            new_location = row_index + row_change, col_index + col_change
-                            if self.is_valid_location(new_location):
-                                possible_directions.append(direction)
-                            remaining_directions = possible_directions
-                            # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
-                                # print((row_index,col_index), remaining_directions)
+
+                            if not self.is_valid_location((row_index + row_change, col_index + col_change)):
+                                invalid_directions.append(direction)
+
+                        for direction in invalid_directions:
+                            remaining_directions.remove(direction)
 
                         # 3) Figure out the best direction the species can move (according to its vision)
-                        current_location = row_index, col_index
-                        new_direction = self.decide_direction(species, current_location, remaining_directions)
-                        
+                        new_direction = self.decide_direction(
+                            species, (row_index, col_index),
+                            remaining_directions)
+
                         # 4) Set this as the species' last moved direction, and make a move in this direction
                         species.last_moved_direction = new_direction
-                        # if row_index >= 99 or row_index <=0 or col_index >= 99 or col_index <= 0:
-                            # print((row_index,col_index),new_direction, remaining_directions)
+
                         row_change, col_change = World.directions_to_location_change[new_direction]
 
                         self.add_species_to_grid(
@@ -625,8 +757,6 @@ class World:
 
         If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics.
         @Atreyi to explain in more detail  
-
-        TODO: Add speed related energy waste
         """
 
         food_value = constants.FOOD_VALUE
@@ -681,18 +811,23 @@ class World:
         """
         Each species loses a set amount of energy at the end of every day. 
         This energy loss is proportional to the square of the speed of the species.
-        Species lose an additional amount of energy proportional to their vision trait 
+        Species lose an additional amount of energy proportional to their vision trait
+        Maximum energy is capped at a value that increases with the size of the species 
         """
 
         energy_loss_base = constants.ENERGY_LOSS
+        food_value = constants.FOOD_VALUE
+        initial_energy = constants.INITIAL_ENERGY
 
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
                     energy_loss = (species.speed**2) * energy_loss_base
-                    energy_loss += ((species.size) * energy_loss_base)*5
-                    energy_loss += ((species.vision) * energy_loss_base)/2
+                    energy_loss += ((species.size) * energy_loss_base) * 2 + 1
+                    energy_loss += ((species.vision) * energy_loss_base) / 2
                     species.energy -= energy_loss
+                    maximum_stored_energy = initial_energy + species.size * food_value / 2
+                    species.energy = min(species.energy, maximum_stored_energy)
 
     def species_reproduce(self) -> None:
         """
@@ -700,11 +835,13 @@ class World:
         """
 
         reproduction_threshold = constants.REPRODUCTION_THRESHOLD
-
+        initial_energy = constants.INITIAL_ENERGY
+        
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
-                    if species.energy >= reproduction_threshold:
+                    if species.energy >= reproduction_threshold and species.size >= 3:
+                        species.energy = species.energy - initial_energy
 
                         # Get parent's traits
                         parent_traits = species.get_traits()
@@ -712,9 +849,10 @@ class World:
                         # Add random mutation to generate child's trait values
                         child_traits = Species.get_child_traits(
                             parent_traits, self.mutation_rates)
-                        # print(child_traits)
+
                         # Generate a child from these trait values
-                        location.add_species(Species(
+                        if child_traits is not None:
+                            location.add_species(Species(
                             size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))
 
     def species_die(self) -> bool:
@@ -787,15 +925,15 @@ class World:
             print("\n")
 
         # Pretty print all traits of living species in a table
-        if display_traits:
-            species_traits_list = []
+        species_traits_list = []
 
-            for row in self.grid:
-                for location in row:
-                    for species in location.species_list:
-                        species_traits_list.append(
+
+        for row in self.grid:
+            for location in row:
+                for species in location.species_list:
+                    species_traits_list.append(
                             [species.id, species.size, species.speed, species.vision, species.aggression, species.energy])
-
+        if display_traits:
             species_traits_list.sort(
                 key=lambda species_traits: species_traits[0])
 
@@ -804,3 +942,5 @@ class World:
 
             print(tabulate(table, headers='firstrow', tablefmt='fancygrid'))
             print("\n")
+
+        print("Population:", len(species_traits_list))

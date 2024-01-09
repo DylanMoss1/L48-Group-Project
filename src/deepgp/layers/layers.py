@@ -196,9 +196,9 @@ class Layer(SparseGP_MPI):
         if mpi_comm is not None:
             from ..util.parallel import broadcastArrays
             broadcastArrays([Z], mpi_comm, mpi_root)
-        
         if uncertain_inputs: X = NormalPosterior(X, X_variance)
         if kernel is None: kernel = kern.RBF(dim_up, ARD = True)
+        print(X,kernel.input_dim, X.shape[1])
         assert kernel.input_dim==X.shape[1], "The dimensionality of input has to be equal to the input dimensionality of the kernel!"
         self.Kuu_sigma = Param('Kuu_var', np.zeros(num_inducing)+1e-3, Logexp())
         
