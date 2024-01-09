@@ -8,7 +8,7 @@ NUM_ACTIONS_PER_DAY: 10
 
 # Controls the probability of food being generated at a given location 
 FOOD_PROBABILITY_SCALAR: 1
-FOOD_PROBABILITY_STD: 10
+FOOD_PROBABILITY_STD: 5
 
 # The temperature in which the most food is produced 
 OPTIMAL_TEMPERATURE: 10
@@ -17,7 +17,7 @@ OPTIMAL_TEMPERATURE: 10
 MAXIMUM_SPEED: 1
 
 # Initial energy of a species during *initial* population (not during reproduction)
-INITIAL_ENERGY: 300
+INITIAL_ENERGY: 30
 
 # Amount of energy lost at the end of each day 
 ENERGY_LOSS: 3
@@ -29,11 +29,11 @@ INITIAL_VISION: 1
 INITIAL_AGGRESSION: 1
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
-FOOD_VALUE: 800
-DAMAGE_VALUE: 800
+FOOD_VALUE: 80
+DAMAGE_VALUE: 80
 
 # The amount of energy required to reproduce 
-REPRODUCTION_THRESHOLD: 500
+REPRODUCTION_THRESHOLD: 50
 
 #maximum that a species can do
 MAXIMUM_VISION: 0.5

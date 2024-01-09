@@ -29,12 +29,15 @@ if __name__ == "__main__":
     #     period=1, should_display_day=True, should_display_action=True, should_display_grid=True, should_display_traits=True), max_days=1)
 
     detailed = False
+    is_main_simulator = True
+
+    simulator = main_simulator if is_main_simulator else tiny_simulator
 
     if detailed:
-        days_survived, log = tiny_simulator.run(mutation_rates, debug_info=DebugInfo(
+        days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(
             period=1, should_display_action=True, should_display_day=True, should_display_population=True, should_display_grid=True, should_display_traits=True), max_days=1000)
     else:
-        days_survived, log = tiny_simulator.run(mutation_rates, debug_info=DebugInfo(
+        days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(
             should_display_day=True, should_display_population=True), max_days=1000)
 
     # for log_item in log:

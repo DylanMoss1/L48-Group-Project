@@ -360,7 +360,7 @@ class World:
         traits_dict = self.get_traits_of_living_species()
         temperature, probability_of_food = self.add_food_to_grid()
         self.species_hibernate()
-        
+
         for action_number in range(self.num_actions_per_day):
             if debug_info.should_display_action:
 
@@ -369,7 +369,7 @@ class World:
 
             self.species_move(action_number)
             self.species_consume_food()
-            
+
         self.species_lose_energy()
         self.species_reproduce()
 
@@ -480,7 +480,7 @@ class World:
             Temperature on the current day
         """
 
-        return 8 + 18 * math.sin(2 * math.pi * self.day / 100)  # + 0.19 * (self.day / (365 * 10))
+        return 10 + 18 * math.sin(2 * math.pi * self.day / 100) + (self.day / 50)
 
     def add_food_to_grid(self) -> None:
         """
@@ -505,6 +505,10 @@ class World:
 
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
+
+        print(temperature)
+        print(abs(temperature - optimal_temperature))
+        print(probability_of_food)
 
         for row in self.grid:
             for location in row:
@@ -652,7 +656,7 @@ class World:
         parameter = constants.MAXIMUM_VISION
         sight = species.vision
         current_species_row_index, current_species_col_index = species_location
-        vision = self.grid_length_size* sight * parameter
+        vision = self.grid_length_size * sight * parameter
         # Look {vision // 1} spaces in all possible directions
         for current_vision in range(1, math.floor(vision) + 1):
 
@@ -706,7 +710,8 @@ class World:
             for col_index, location in enumerate(row):
                 for species in location.species_list:
 
-                    slowness_factor = (int)(maximum_speed/species.speed) + 1 if species.speed > 0 else -1
+                    slowness_factor = (int)(
+                        maximum_speed/species.speed) + 1 if species.speed > 0 else -1
 
                     able_to_move = action_number % slowness_factor == 0 and (
                         not species.hibernate) and (slowness_factor != -1)
@@ -765,7 +770,8 @@ class World:
                 if len(location.species_list) > 0 and len(location.food_list) > 0:
                     if len(location.species_list) == 1:
                         for species in location.species_list:
-                            species.energy += len(location.food_list) * food_value
+                            species.energy += len(location.food_list) * \
+                                food_value
                     else:
                         aggression = [
                             species.aggression for species in location.species_list]
@@ -788,7 +794,8 @@ class World:
                             for species in location.species_list:
                                 if species.aggression > 0.5:
                                     if species.id == winner_hawk:
-                                        species.energy += len(location.food_list) * food_value
+                                        species.energy += len(
+                                            location.food_list) * food_value
                                         species.energy -= max_damage * damage_value
                                     else:
                                         species.energy -= species.aggression * damage_value
@@ -832,7 +839,7 @@ class World:
         """
 
         reproduction_threshold = constants.REPRODUCTION_THRESHOLD
-        
+
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
@@ -850,8 +857,7 @@ class World:
                         # Generate a child from these trait values
                         if child_traits is not None:
                             location.add_species(Species(
-                            size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"], energy=reproduction_threshold / 2))
-                        
+                                size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"], energy=reproduction_threshold / 2))
 
     def species_die(self) -> bool:
         """
@@ -867,12 +873,18 @@ class World:
 
         for row in self.grid:
             for location in row:
+
+                dead_species_list = []
+
                 for species in location.species_list:
                     if species.energy <= 0:
                         species.death = True
-                        location.species_list.remove(species)
+                        dead_species_list.append(species)
                     else:
                         num_alive_species += 1
+
+                for species in dead_species_list:
+                    location.species_list.remove(species)
 
         return num_alive_species
 
@@ -943,12 +955,11 @@ class World:
         # Pretty print all traits of living species in a table
         species_traits_list = []
 
-
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
                     species_traits_list.append(
-                            [species.id, species.size, species.speed, species.vision, species.aggression, species.energy])
+                        [species.id, species.size, species.speed, species.vision, species.aggression, species.energy])
         if display_traits:
             species_traits_list.sort(
                 key=lambda species_traits: species_traits[0])
