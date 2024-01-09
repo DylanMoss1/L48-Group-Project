@@ -815,7 +815,7 @@ class World:
 
         energy_loss_base = constants.ENERGY_LOSS
         food_value = constants.FOOD_VALUE
-        initial_energy = constants.INITIAL_ENERGY
+        reproduction_threshold = constants.REPRODUCTION_THRESHOLD
 
         for row in self.grid:
             for location in row:
@@ -823,7 +823,7 @@ class World:
                     energy_loss = ((1 + species.speed)**2) * energy_loss_base
                     energy_loss += ((species.vision) * energy_loss_base) / 2
                     species.energy -= energy_loss
-                    maximum_stored_energy = initial_energy + species.size * food_value * 10
+                    maximum_stored_energy = reproduction_threshold + species.size * food_value * 10
                     species.energy = min(species.energy, maximum_stored_energy)
 
     def species_reproduce(self) -> None:
