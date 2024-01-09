@@ -71,6 +71,6 @@ def graph_histogram(
 
 
 if __name__ == "__main__":
-    results = run_simulator(5)
+    results = run_simulator(20)
     # results = pd.read_csv("./tests/1-1-1-1-5.csv")
     graph_histogram(results)
