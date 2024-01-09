@@ -652,10 +652,10 @@ class World:
         best_direction : str 
             The best direction the species can move in (based off the food found with the species' vision)
         """
-
-        vision = species.vision
+        parameter = constants.MAXIMUM_VISION
+        sight = species.vision
         current_species_row_index, current_species_col_index = species_location
-
+        vision = self.grid_length_size* sight * parameter
         # Look {vision // 1} spaces in all possible directions
         for current_vision in range(1, math.floor(vision) + 1):
 
@@ -763,6 +763,8 @@ class World:
 
         If more than one species are in the same location with food, they share or fight over the food according to their aggression metrics.
         @Atreyi to explain in more detail  
+
+        The dove to hawk threshold is 0.5
         """
 
         food_value = constants.FOOD_VALUE
@@ -777,7 +779,7 @@ class World:
                     else:
                         aggression = [
                             species.aggression for species in location.species_list]
-                        if all(aggr <= 1 for aggr in aggression):
+                        if all(aggr <= 0.5 for aggr in aggression):
                             for species in location.species_list:
                                 species.energy += len(location.food_list) * food_value / \
                                     len(location.species_list)
@@ -787,19 +789,19 @@ class World:
                             if len(winner_hawk_indices) == 1:
                                 max_damage = max(
                                     [i for i in aggression if i < max(aggression)])
-                                if max_damage <= 1:
+                                if max_damage <= 0.5:
                                     max_damage = 0
                             else:
                                 max_damage = max(aggression)
                             winner_hawk = location.species_list[random.sample(
                                 winner_hawk_indices, 1)[0]].id
                             for species in location.species_list:
-                                if species.aggression > 1:
+                                if species.aggression > 0.5:
                                     if species.id == winner_hawk:
                                         species.energy += len(location.food_list) * food_value
-                                        species.energy -= max_damage / 2 * damage_value
+                                        species.energy -= max_damage * damage_value
                                     else:
-                                        species.energy -= species.aggression / 2 * damage_value
+                                        species.energy -= species.aggression * damage_value
                     location.food_list = []
 
     def species_hibernate(self) -> None:
@@ -809,7 +811,7 @@ class World:
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
-                    hibernation_risk = (species.size - 1)/2
+                    hibernation_risk = species.size
                     hibernate = random.random() < hibernation_risk
                     species.hibernate = hibernate
 
@@ -828,11 +830,10 @@ class World:
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
-                    energy_loss = (species.speed**2) * energy_loss_base
-                    energy_loss += ((species.size) * energy_loss_base) * 2 + 1
+                    energy_loss = ((1 + species.speed)**2) * energy_loss_base
                     energy_loss += ((species.vision) * energy_loss_base) / 2
                     species.energy -= energy_loss
-                    maximum_stored_energy = initial_energy + species.size * food_value / 5
+                    maximum_stored_energy = initial_energy + species.size * food_value * 10
                     species.energy = min(species.energy, maximum_stored_energy)
 
     def species_reproduce(self) -> None:
