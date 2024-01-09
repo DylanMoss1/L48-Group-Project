@@ -372,7 +372,7 @@ class World:
 
         self.species_lose_energy()
         self.species_reproduce()
-
+        self.species_age()
         num_species_alive = self.species_die()
 
         log_item = LogItem(self.day, num_species_alive,
