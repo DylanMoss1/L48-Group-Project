@@ -363,7 +363,6 @@ class World:
         
         for action_number in range(self.num_actions_per_day):
             if debug_info.should_display_action:
-                # print("Action number:", action_number)
 
                 self.pprint(debug_info.should_display_grid,
                             debug_info.should_display_traits)
@@ -375,7 +374,7 @@ class World:
         self.species_reproduce()
 
         num_species_alive = self.species_die()
-        # print("Current population:", num_species_alive)
+
         log_item = LogItem(self.day, num_species_alive,
                            temperature, probability_of_food, traits_dict)
 
@@ -489,8 +488,6 @@ class World:
 
         We model the probability of a food appearing in a location as a scaled Gaussian distribution:
             probability_of_food = scalar * exp(-0.5 * ((temperature - optimal_temperature) / sigma) ** 2)
-
-        TODO: find a scientific backing behind how food availability depends on temperature
 
         Returns
         -------
@@ -805,8 +802,8 @@ class World:
             for location in row:
                 for species in location.species_list:
                     hibernation_risk = species.size
-                    hibernate = random.random() < hibernation_risk
-                    species.hibernate = hibernate
+                    is_hibernating = random.random() < hibernation_risk
+                    species.hibernate = is_hibernating
 
     def species_lose_energy(self) -> None:
         """
