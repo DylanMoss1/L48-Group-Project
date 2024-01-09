@@ -96,14 +96,9 @@ class Species:
 
         new_traits = {"size": None, "speed": None,
                       "vision": None, "aggression": None}
-        maximum_speed = constants.MAXIMUM_SPEED
 
         for key, value in original_traits.items():
-            if key == "speed":
-                # To prevent divide by zero error
-                new_traits[key] = min(max(normal(loc=value, scale=mutation_rates[key]),0),maximum_speed)
-            else:
-                new_traits[key] = max(normal(loc=value, scale=mutation_rates[key]),0)
+            new_traits[key] = min(max(normal(loc=value, scale=mutation_rates[key]),0),1)
 
             # Consider genetic disorder due to mutation
             genetic_change = abs((new_traits[key] - value)/value)

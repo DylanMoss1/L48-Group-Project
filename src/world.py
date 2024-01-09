@@ -481,7 +481,7 @@ class World:
             Temperature on the current day
         """
 
-        return 8 - 18 * math.cos(2 * math.pi * (self.day + 100) / 365) + 0.19 * (self.day / (365 * 10))
+        return 8 + 18 * math.sin(2 * math.pi * self.day / 100)  # + 0.19 * (self.day / (365 * 10))
 
     def add_food_to_grid(self) -> None:
         """
@@ -684,7 +684,7 @@ class World:
 
         For all species 
         - 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
-        - 2) Determine what directions it can move in (not off the grid) ##, and not towards the previously moved direction) <- food spawns more regularly than creature movement, so this is removed
+        - 2) Determine what directions it can move in (not off the grid)
         - 3) Figure out the best direction the species can move (according to its vision)
         - 4) Set this as the species' last moved direction, and make a move in this direction
 
@@ -719,15 +719,8 @@ class World:
                     # 1) If it is able to move (according to its speed) and it has not previously moved this action_number...
                     if able_to_move and not has_previously_moved:
 
-                        # 2) Determine what directions it can move in (not off the grid ## , and not towards the previously moved direction) <- food spawns more regularly than creature movement, so this is removed
+                        # 2) Determine what directions it can move in (not off the grid
                         remaining_directions = World.directions.copy()
-
-                        # food spawns more regularly than creature movement, so this is removed
-
-                        # # Remove previously moved direction
-                        # if species.last_moved_direction in remaining_directions:
-                        #     remaining_directions.remove(World.opposite_direction[
-                        #         species.last_moved_direction])
 
                         invalid_directions = []
 
@@ -861,6 +854,7 @@ class World:
                         if child_traits is not None:
                             location.add_species(Species(
                             size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))
+                        
 
     def species_die(self) -> bool:
         """
