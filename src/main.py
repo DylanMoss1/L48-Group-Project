@@ -9,10 +9,10 @@ if __name__ == "__main__":
     tiny_simulator = TinySimulator()
 
     mutation_rates = {
-        "size": 0.1,
-        "speed": 0.1,
-        "vision": 0.1,
-        "aggression": 0.1,
+        "size": 0.2,
+        "speed": 0.2,
+        "vision": 0.2,
+        "aggression": 0.2,
     }
 
     # mutation_start_point = {
@@ -39,6 +39,8 @@ if __name__ == "__main__":
     else:
         days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(
             should_display_day=True, should_display_population=True), max_days=1000)
+
+    print(log[-1])
 
     # for log_item in log:
     #     print(log_item)

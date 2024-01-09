@@ -1,7 +1,7 @@
 from typing import Dict
 import constants
 import numpy as np
-from numpy.random import normal, random
+import random 
 
 # Generate unique species IDs
 
@@ -17,10 +17,10 @@ def get_new_species_id() -> int:
 # Collect relevant constants
 
 
-initial_size = constants.INITIAL_SIZE
-initial_speed = constants.INITIAL_SPEED
-initial_vision = constants.INITIAL_VISION
-initial_aggression = constants.INITIAL_AGGRESSION
+# initial_size = constants.INITIAL_SIZE
+# initial_speed = constants.INITIAL_SPEED
+# initial_vision = constants.INITIAL_VISION
+# initial_aggression = constants.INITIAL_AGGRESSION
 
 initial_energy = constants.INITIAL_ENERGY
 
@@ -48,7 +48,7 @@ class Species:
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
     """
 
-    def __init__(self, size=initial_size, speed=initial_speed, vision=initial_vision, aggression=initial_aggression, energy=initial_energy) -> None:
+    def __init__(self, size=random.random(), speed=random.random(), vision=random.random(), aggression=random.random(), energy=initial_energy) -> None:
         """
         Initialise a Species object.
         """
@@ -102,13 +102,13 @@ class Species:
 
         for key, value in original_traits.items():
             new_traits[key] = min(
-                max(normal(loc=value, scale=mutation_rates[key]), 0), 1)
+                max(np.random.normal(loc=value, scale=mutation_rates[key]), 0), 1)
 
             # Consider genetic disorder due to mutation
-            genetic_change = abs((new_traits[key] - value)/value)
+            genetic_change = abs(new_traits[key] - value)
             if genetic_change >= 0.01:
                 # print("Let god decide.", genetic_change)
-                fate = random()
+                fate = np.random.random()
                 if fate <= np.exp((genetic_change-0.01)*30)/100:
                     # print(fate,np.exp((genetic_change*10))/100, "Death due to genetic disorder", value, new_traits[key])
                     return None
