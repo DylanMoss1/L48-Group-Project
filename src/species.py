@@ -62,6 +62,7 @@ class Species:
         self.death = False
         self.last_moved_direction = None
         self.hibernate = False
+        self.age = 0
 
     def get_traits(self) -> Dict[str, float]:
         """

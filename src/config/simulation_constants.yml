@@ -37,3 +37,6 @@ REPRODUCTION_THRESHOLD: 20
 
 #maximum that a species can do
 MAXIMUM_VISION: 0.5
+
+#maximum duration that a creature can live
+MAXIMUM_AGE: 200
