@@ -62,6 +62,7 @@ class Species:
         self.death = False
         self.last_moved_direction = None
         self.hibernate = False
+        self.age = 0
 
     def get_traits(self) -> Dict[str, float]:
         """
@@ -105,7 +106,7 @@ class Species:
                 max(normal(loc=value, scale=mutation_rates[key]), 0), 1)
 
             # Consider genetic disorder due to mutation
-            genetic_change = abs((new_traits[key] - value)/value)
+            genetic_change = abs((new_traits[key] - value))
             if genetic_change >= 0.01:
                 # print("Let god decide.", genetic_change)
                 fate = random()

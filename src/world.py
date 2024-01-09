@@ -507,8 +507,6 @@ class World:
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
         print(temperature)
-        print(abs(temperature - optimal_temperature))
-        print(probability_of_food)
 
         for row in self.grid:
             for location in row:
@@ -832,7 +830,18 @@ class World:
                     species.energy -= energy_loss
                     maximum_stored_energy = reproduction_threshold + species.size * food_value * 10
                     species.energy = min(species.energy, maximum_stored_energy)
+    
+    def species_age(self) -> None:
+        """
+        all creatures get older
+        """
 
+        for row in self.grid:
+            for location in row:
+                for species in location.species_list:
+                    species.age += 1
+
+    
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
@@ -870,6 +879,7 @@ class World:
         """
 
         num_alive_species = 0  # Calculated like this for the logs
+        maximum_age = constants.MAXIMUM_AGE
 
         for row in self.grid:
             for location in row:
@@ -877,7 +887,7 @@ class World:
                 dead_species_list = []
 
                 for species in location.species_list:
-                    if species.energy <= 0:
+                    if species.energy <= 0 or species.age >= maximum_age:
                         species.death = True
                         dead_species_list.append(species)
                     else:

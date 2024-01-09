@@ -32,3 +32,4 @@ DAMAGE_VALUE = simulation_constants["DAMAGE_VALUE"]
 
 REPRODUCTION_THRESHOLD = simulation_constants["REPRODUCTION_THRESHOLD"]
 MAXIMUM_VISION = simulation_constants["MAXIMUM_VISION"]
+MAXIMUM_AGE = simulation_constants["MAXIMUM_AGE"]
