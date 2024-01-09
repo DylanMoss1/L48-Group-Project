@@ -510,7 +510,7 @@ class World:
             for location in row:
                 if random.random() < probability_of_food:
                     location.add_food()
-        print("Food generation likelihood:", probability_of_food)
+
         return temperature, probability_of_food
 
     def add_species_to_grid(self, species, row_index, col_index) -> None:
@@ -958,5 +958,3 @@ class World:
 
             print(tabulate(table, headers='firstrow', tablefmt='fancygrid'))
             print("\n")
-
-        print("Population:", len(species_traits_list))

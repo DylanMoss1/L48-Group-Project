@@ -6,6 +6,7 @@ from pprint import pprint
 if __name__ == "__main__":
 
     main_simulator = MainSimulator()
+    tiny_simulator = TinySimulator() 
 
     mutation_rates = {
         "size": 0,
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     # days_survived, log = tiny_simulator.run(mutation_rates, debug_info=DebugInfo(
     #     period=1, should_display_day=True, should_display_action=True, should_display_grid=True, should_display_traits=True), max_days=1)
 
-    days_survived, log = main_simulator.run(mutation_rates, debug_info=DebugInfo(
+    days_survived, log = tiny_simulator.run(mutation_rates, debug_info=DebugInfo(
         period=10, should_display_day=True, should_display_population=True), max_days=1000)
 
     print(days_survived)
