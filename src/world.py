@@ -263,12 +263,12 @@ class World:
         traits_dict = self.get_traits_of_living_species()
         temperature, probability_of_food = self.add_food_to_grid()
         self.species_hibernate()
-
+        
         for action_number in range(self.num_actions_per_day):
             self.species_move(action_number)
             self.species_consume_food()
             self.species_reproduce()
-
+            
         self.species_lose_energy()
         num_species_alive = self.species_die()
 
@@ -629,18 +629,21 @@ class World:
         TODO: Add speed related energy waste
         """
 
+        food_value = constants.FOOD_VALUE
+        damage_value = constants.DAMAGE_VALUE
+
         for row in self.grid:
             for location in row:
                 if len(location.species_list) > 0 and len(location.food_list) > 0:
                     if len(location.species_list) == 1:
                         for species in location.species_list:
-                            species.energy += len(location.food_list)
+                            species.energy += len(location.food_list) * food_value
                     else:
                         aggression = [
                             species.aggression for species in location.species_list]
                         if all(aggr <= 1 for aggr in aggression):
                             for species in location.species_list:
-                                species.energy += len(location.food_list) / \
+                                species.energy += len(location.food_list) * food_value / \
                                     len(location.species_list)
                         else:
                             winner_hawk_indices = [
@@ -657,10 +660,10 @@ class World:
                             for species in location.species_list:
                                 if species.aggression > 1:
                                     if species.id == winner_hawk:
-                                        species.energy += len(location.food_list)
-                                        species.energy -= max_damage / 2
+                                        species.energy += len(location.food_list) * food_value
+                                        species.energy -= max_damage / 2 * damage_value
                                     else:
-                                        species.energy -= species.aggression / 2
+                                        species.energy -= species.aggression / 2 * damage_value
                     location.food_list = []
 
     def species_hibernate(self) -> None:
@@ -687,6 +690,7 @@ class World:
             for location in row:
                 for species in location.species_list:
                     energy_loss = (species.speed**2) * energy_loss_base
+                    energy_loss += ((species.size) * energy_loss_base)*5
                     energy_loss += ((species.vision) * energy_loss_base)/2
                     species.energy -= energy_loss
 

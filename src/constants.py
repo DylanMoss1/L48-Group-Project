@@ -28,5 +28,6 @@ INITIAL_VISION = simulation_constants["INITIAL_VISION"]
 INITIAL_AGGRESSION = simulation_constants["INITIAL_AGGRESSION"]
 
 FOOD_VALUE = simulation_constants["FOOD_VALUE"]
+DAMAGE_VALUE = simulation_constants["DAMAGE_VALUE"]
 
 REPRODUCTION_THRESHOLD = simulation_constants["REPRODUCTION_THRESHOLD"]
