@@ -78,12 +78,15 @@ class DebugInfo:
         Should the grid state be printed in the debug info (default is False) 
     should_display_traits : bool
         Should the traits of each species be printed in the debug info (default is False) 
+    should_display_population : bool 
+        Should display the total number of living species on this given day (default is False)
     """
     period: int = 1
     should_display_day: bool = False
     should_display_action: bool = False
     should_display_grid: bool = False
     should_display_traits: bool = False
+    should_display_population: bool = False
 
 
 @dataclass
@@ -330,6 +333,9 @@ class World:
 
             if debug_info.should_display_day:
                 print("Day number:", self.day)
+
+            if debug_info.should_display_population:
+                print("Population:", self.count_living_species())
 
             self.pprint(debug_info.should_display_grid,
                         debug_info.should_display_traits)
@@ -875,6 +881,24 @@ class World:
                         location.species_list.remove(species)
                     else:
                         num_alive_species += 1
+
+        return num_alive_species
+
+    def count_living_species(self) -> int:
+        """
+        Count the total number of species that are still alive in the simulation World.
+
+        Returns
+        -------
+        num_species_alive : int 
+            The number of species that are still alive in the simulation World
+        """
+
+        num_alive_species = 0
+
+        for row in self.grid:
+            for location in row:
+                num_alive_species += len(location.species_list)
 
         return num_alive_species
 

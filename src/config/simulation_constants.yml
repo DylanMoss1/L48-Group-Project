@@ -32,5 +32,5 @@ INITIAL_AGGRESSION: 1
 FOOD_VALUE: 800
 DAMAGE_VALUE: 800
 
-# The amount of enery required to reproduce 
+# The amount of energy required to reproduce 
 REPRODUCTION_THRESHOLD: 500
