@@ -7,7 +7,7 @@ NUM_INITIAL_SPECIES_FRACTION: 0.2
 NUM_ACTIONS_PER_DAY: 10
 
 # Controls the probability of food being generated at a given location 
-FOOD_PROBABILITY_SCALAR: 1.5
+FOOD_PROBABILITY_SCALAR: 1
 FOOD_PROBABILITY_STD: 10
 
 # The temperature in which the most food is produced 

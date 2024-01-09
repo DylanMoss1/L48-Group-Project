@@ -837,8 +837,8 @@ class World:
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
-                    if species.energy >= reproduction_threshold and species.size >= 3:
-                        species.energy = species.energy - initial_energy
+                    if species.energy >= reproduction_threshold:
+                        species.energy = species.energy - reproduction_threshold / 2
 
                         # Get parent's traits
                         parent_traits = species.get_traits()
@@ -847,10 +847,13 @@ class World:
                         child_traits = Species.get_child_traits(
                             parent_traits, self.mutation_rates)
 
+                        print("reached threshold")
+
                         # Generate a child from these trait values
                         if child_traits is not None:
+                            print("Added child")
                             location.add_species(Species(
-                            size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"]))
+                            size=child_traits["size"], speed=child_traits["speed"], vision=child_traits["vision"], aggression=child_traits["aggression"], energy=reproduction_threshold / 2))
                         
 
     def species_die(self) -> bool:
