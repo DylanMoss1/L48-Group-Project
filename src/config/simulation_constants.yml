@@ -8,7 +8,7 @@ NUM_ACTIONS_PER_DAY: 10
 
 # Controls the probability of food being generated at a given location 
 FOOD_PROBABILITY_SCALAR: 1
-FOOD_PROBABILITY_STD: 8
+FOOD_PROBABILITY_STD: 9
 
 # The temperature in which the most food is produced 
 OPTIMAL_TEMPERATURE: 10
@@ -39,4 +39,4 @@ REPRODUCTION_THRESHOLD: 20
 MAXIMUM_VISION: 0.5
 
 #maximum duration that a creature can live
-MAXIMUM_AGE: 200
+MAXIMUM_AGE: 100
