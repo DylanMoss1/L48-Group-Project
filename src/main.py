@@ -39,7 +39,7 @@ if __name__ == "__main__":
     else:
         #days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(
          #   should_display_day=True, should_display_population=True), max_days=1000)
-        days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(should_display_day=True, should_display_population=True), max_days=2000)
+        days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(should_display_day=True, should_display_population=True, should_display_traits=True), max_days=2000)
 
     print(log[-1])
 
