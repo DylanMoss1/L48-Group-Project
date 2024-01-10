@@ -100,11 +100,11 @@ class Simulator(ABC):
 
 class MainSimulator(Simulator):
     """
-    A class containing the ground truth simulator. This has a 100 x 100 grid. 
+    A class containing the ground truth simulator. This has a 50 x 50 grid. 
     """
 
     def __init__(self):
-        super().__init__(100)
+        super().__init__(50)
 
 
 class SmallSimulator(Simulator):
