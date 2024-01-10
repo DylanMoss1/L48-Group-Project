@@ -480,7 +480,7 @@ class World:
             Temperature on the current day
         """
 
-        return 10 + 18 * math.sin(2 * math.pi * self.day / 100) + (self.day / 100)
+        return 10 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 100)
 
     def add_food_to_grid(self) -> None:
         """
@@ -507,7 +507,6 @@ class World:
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
         print(probability_of_food)
-        # print(temperature)
 
         for row in self.grid:
             for location in row:

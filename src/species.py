@@ -1,7 +1,7 @@
 from typing import Dict
 import constants
 import numpy as np
-import random 
+import random
 
 # Generate unique species IDs
 
@@ -105,13 +105,21 @@ class Species:
             new_traits[key] = min(
                 max(np.random.normal(loc=value, scale=mutation_rates[key]), 0), 1)
 
-            # Consider genetic disorder due to mutation
             genetic_change = abs(new_traits[key] - value)
-            if genetic_change >= 0.01:
-                # print("Let god decide.", genetic_change)
-                fate = np.random.random()
-                if fate <= np.exp((genetic_change-0.01)*30)/100:
-                    # print(fate,np.exp((genetic_change*10))/100, "Death due to genetic disorder", value, new_traits[key])
-                    return None
+
+            fate = np.random.random()
+
+            if fate <= genetic_change / 10:
+                return None
+
+            # # Consider genetic disorder due to mutation
+            # genetic_change = abs(new_traits[key] - value)
+            # if genetic_change >= 0.01:
+            #     # print("Let god decide.", genetic_change)
+            #     fate = np.random.random()
+            #     if fate <= np.exp((genetic_change-0.01)*30)/100:
+            #         print("DEATH")
+            #         # print(fate,np.exp((genetic_change*10))/100, "Death due to genetic disorder", value, new_traits[key])
+            #         return None
 
         return new_traits
