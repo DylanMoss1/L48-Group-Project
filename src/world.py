@@ -375,6 +375,11 @@ class World:
         self.species_age()
         num_species_alive = self.species_die()
 
+        # Clean all leftover food
+        for row in self.grid:
+            for location in row:
+                location.food_list = []
+
         log_item = LogItem(self.day, num_species_alive,
                            temperature, probability_of_food, traits_dict)
 
@@ -506,12 +511,15 @@ class World:
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
-        print(probability_of_food)
+        print(temperature,probability_of_food)
 
+        sum = 0
         for row in self.grid:
             for location in row:
                 if random.random() < probability_of_food:
                     location.add_food()
+                sum += len(location.food_list)
+        print("Total food:", sum)
 
         return temperature, probability_of_food
 
@@ -827,10 +835,10 @@ class World:
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
-                    energy_loss = ((1 + species.speed)**2) * energy_loss_base
+                    energy_loss = ((0.25 + species.speed)**2) * energy_loss_base
                     energy_loss += ((species.vision) * energy_loss_base) / 2
                     species.energy -= energy_loss
-                    maximum_stored_energy = reproduction_threshold + species.size * food_value * 10
+                    maximum_stored_energy = species.size * food_value * 10
                     species.energy = min(species.energy, maximum_stored_energy)
     
     def species_age(self) -> None:

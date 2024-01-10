@@ -48,7 +48,7 @@ class Species:
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
     """
 
-    def __init__(self, size=None, speed=None, vision=None, aggression=None, energy=initial_energy) -> None:
+    def __init__(self, size=0.5, speed=0.5, vision=0.5, aggression=0.5, energy=initial_energy) -> None:
         """
         Initialise a Species object.
         """

@@ -1,14 +1,14 @@
 # Initial number of species places on the grid, as a fraction of the total number of locations on the grid.
 # E.g., a 10x10 grid (100 locations) with NUM_INITIAL_SPECIES_FRACTION=0.2 means 20 species are placed on the grid 
-NUM_INITIAL_SPECIES_FRACTION: 0.2
+NUM_INITIAL_SPECIES_FRACTION: 0.5
 
 # Number of moving and feeding actions made per day
 # NUM_ACTIONS_PER_DAY = MAX_SPEED x SPEED_MODIFIER (@Atreyi what is max speed? Should this be defined in this file?)
-NUM_ACTIONS_PER_DAY: 10
+NUM_ACTIONS_PER_DAY: 5
 
 # Controls the probability of food being generated at a given location 
-FOOD_PROBABILITY_SCALAR: 0.5
-FOOD_PROBABILITY_STD: 8
+FOOD_PROBABILITY_SCALAR: 1.5
+FOOD_PROBABILITY_STD: 5
 
 # The temperature in which the most food is produced 
 OPTIMAL_TEMPERATURE: 10
@@ -20,7 +20,7 @@ MAXIMUM_SPEED: 1
 INITIAL_ENERGY: 10
 
 # Amount of energy lost at the end of each day 
-ENERGY_LOSS: 20
+ENERGY_LOSS: 15
 
 # Initial trait values 
 INITIAL_SIZE: 0.5
@@ -29,11 +29,11 @@ INITIAL_VISION: 0.5
 INITIAL_AGGRESSION: 0.5
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
-FOOD_VALUE: 10
+FOOD_VALUE: 15
 DAMAGE_VALUE: 10
 
 # The amount of energy required to reproduce 
-REPRODUCTION_THRESHOLD: 15
+REPRODUCTION_THRESHOLD: 20
 
 #maximum that a species can do
 MAXIMUM_VISION: 0.5
