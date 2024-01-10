@@ -20,7 +20,7 @@ MAXIMUM_SPEED: 1
 INITIAL_ENERGY: 10
 
 # Amount of energy lost at the end of each day 
-ENERGY_LOSS: 3
+ENERGY_LOSS: 20
 
 # Initial trait values 
 INITIAL_SIZE: 0.5
@@ -29,11 +29,11 @@ INITIAL_VISION: 0.5
 INITIAL_AGGRESSION: 0.5
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
-FOOD_VALUE: 15
+FOOD_VALUE: 10
 DAMAGE_VALUE: 10
 
 # The amount of energy required to reproduce 
-REPRODUCTION_THRESHOLD: 20
+REPRODUCTION_THRESHOLD: 15
 
 #maximum that a species can do
 MAXIMUM_VISION: 0.5
