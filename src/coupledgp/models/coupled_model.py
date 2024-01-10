@@ -10,13 +10,9 @@ from emukit.sensitivity.monte_carlo import MonteCarloSensitivity
 from emukit.core.interfaces import IModel
 from emukit.model_wrappers import GPyModelWrapper, GPyMultiOutputWrapper
 
-from utils import (
-    format_data_for_drift_model,
-    format_data_for_population_model,
-)
-from utils import emulator_inputs as ei
-from models.genetic_drift import GeneticDriftModel
-from models.population import PopulationModel
+from ..utils import *
+from ..models.genetic_drift import GeneticDriftModel
+from ..models.population import PopulationModel
 
 
 @dataclass
@@ -44,7 +40,6 @@ class CoupledGPModel(IModel):
     Wrapper for the coupled model between genetic drift and population.
 
     The model takes as input:
-     - the initial day
      - the initial population
      - the mutation rates
      - the coupling period
@@ -55,145 +50,94 @@ class CoupledGPModel(IModel):
     """
 
     def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
         x_drift, y_drift = format_data_for_drift_model(X, Y)
         x_pop, y_pop = format_data_for_population_model(X, Y)
-
         drift_gpy = GeneticDriftModel(x_drift, y_drift)
         self.drift_emukit = GPyMultiOutputWrapper(
-            drift_gpy, drift_gpy.num_outputs
+            drift_gpy, drift_gpy.num_outputs, 1
         )
         pop_gpy = PopulationModel(x_pop, y_pop)
         self.pop_emukit = GPyModelWrapper(pop_gpy)
 
         # define input parameter spaces for sensitivity analysis
-        # random start day within a year
-        day = DiscreteParameter("day", range(1, 366))
-        # 100 x 100 grid (10 - 30% populated)
-        population = DiscreteParameter("population", range(1000, 3000))
-        # need to tweak these limits possibly
-        size = ContinuousParameter("size", 0.5, 2.5)
-        speed = ContinuousParameter("speed", 0.5, 2.5)
-        vision = ContinuousParameter("vision", 0.5, 2.5)
-        aggression = ContinuousParameter("aggression", 0.5, 2.5)
-        m_size = ContinuousParameter("m_size", 0, 5)
-        m_speed = ContinuousParameter("m_speed", 0, 5)
-        m_vision = ContinuousParameter("m_vision", 0, 5)
-        m_aggression = ContinuousParameter("m_aggression", 0, 5)
-        # between a day and a month
-        coupling = DiscreteParameter("coupling", [1, 7, 30])
+        self.drift_space = drift_space
+        self.pop_space = population_space
 
-        self.space = ParameterSpace(
-            [
-                population,
-                m_size,
-                m_speed,
-                m_vision,
-                m_aggression,
-                coupling,
-            ]
-        )
-        self.drift_space = ParameterSpace(
-            [
-                day,
-                population,
-                size,
-                speed,
-                vision,
-                aggression,
-                m_size,
-                m_speed,
-                m_vision,
-                m_aggression,
-            ]
-        )
-        self.pop_space = ParameterSpace(
-            [day, population, size, speed, vision, aggression]
-        )
-
-    def predict(self, X: np.ndarray) -> Tuple[int, List[EmulatorLogItem]]:
+    def predict(self, X: np.ndarray, max_iters: int = None) -> int:
         """
         Predicts the number of days until extinction by iteratively alternating between running the genetic drift emulator and the population emulator for a fixed number of time steps. The inputs of both emulators can either feed back into itself or feed forward into the each other.
 
         Args:
             X (np.ndarray): an array of inputs to predict in the form (n_samples x n_inputs) where the inputs are (population, m_size, m_speed, m_vision, m_aggression, coupling)
+            max_iters (int, optional): sets a hard limit on the number of iterations. Any unfinished simulations will have 0 as an output. Defaults to None.
 
         Returns:
             int: the number of days until extinction
-            (not implemented yet) List[EmulatorLogItem]: a log of the day/population/traits at each emulated timestep
         """
-        # split the input array into three based on coupling values and remove coupling from the inputs
-        day_inputs = X[X[:, -1] == 1, :-1]
-        week_inputs = X[X[:, -1] == 7, :-1]
-        month_inputs = X[X[:, -1] == 30, :-1]
+        # get unique coupling times from inputs
+        coupling_times = np.unique(X[:, -1])
+        # adds input indices at the beginning for filtering
+        X = np.insert(X, [0], np.arange(X.shape[0])[:, None], axis=1)
+        # split input array based on coupling values and remove them from inputs
+        split_inputs = [X[X[:, -1] == t, :-1] for t in coupling_times]
         # store mutation rates for input conversions
-        day_mutation_rates = day_inputs[:, 1:5]
-        week_mutation_rates = week_inputs[:, 1:5]
-        month_mutation_rates = month_inputs[:, 1:5]
-        # lists to store completed runs (population <= 0)
-        completed_days = []
-        completed_weeks = []
-        completed_months = []
-
+        split_temp_mutation_rates = [x[:, 2:6] for x in split_inputs]
         # start emulation with changes in population
-        day_emulator = "population"
-        week_emulator = "population"
-        month_emulator = "population"
+        split_emulators = ["population" for _ in coupling_times]
+
+        # initialize output arrays to 0 (final form is (n_samples x 1) array)
+        final_outputs = np.zeros((X.shape[0], 1))
 
         day = 1
-        day_extinct = False
-        week_extinct = False
-        month_extinct = False
+        # initialize arrays for execution loop
+        is_extinct = [False for _ in coupling_times]
+        # convert coupled inputs to population inputs, following the simulator's method of initializing traits (random between 0 and 1)
+        split_temp_inputs = [
+            coupled_to_population(x, day, np.random.rand(x.shape[0], 4))
+            for x in split_inputs
+        ]
         # start emulation
-        while not day_extinct and not week_extinct and not month_extinct:
-            if not day_extinct:  # run day
-                day_output, day_inputs, day_emulator = self.run_emulation_step(
-                    day_inputs, day_mutation_rates, day_emulator, day, 1
-                )
-            if not week_extinct:  # swap week
-                (
-                    week_output,
-                    week_inputs,
-                    week_emulator,
-                ) = self.run_emulation_step(
-                    week_inputs, week_mutation_rates, week_emulator, day, 7
-                )
-            if not month_extinct:  # swap month
-                (
-                    month_output,
-                    month_inputs,
-                    month_emulator,
-                ) = self.run_emulation_step(
-                    month_inputs, month_mutation_rates, month_emulator, day, 30
-                )
+        while not all(is_extinct):
+            for i, t in enumerate(coupling_times):
+                if not is_extinct[i]:
+                    # run emulation step only for inputs with population > 0
+                    (
+                        population,
+                        split_temp_inputs[i],
+                        split_temp_mutation_rates[i],
+                        split_emulators[i],
+                    ) = self._run_emulation_step(
+                        split_temp_inputs[i],
+                        split_temp_mutation_rates[i],
+                        split_emulators[i],
+                        day,
+                        t,
+                    )
 
-            # check if population <= 0 and split inputs
-            completed_days.append((day, len(day_inputs[:, 1] <= 0)))
-            completed_weeks.append((day, len(week_inputs[:, 1] <= 0)))
-            completed_months.append((day, len(month_inputs[:, 1] <= 0)))
-            day_filter = day_inputs[:, 1] > 0
-            week_filter = week_inputs[:, 1] > 0
-            month_filter = month_inputs[:, 1] > 0
-            day_inputs = day_inputs[day_filter, :]
-            day_mutation_rates = day_mutation_rates[day_filter, :]
-            week_inputs = week_inputs[week_filter, :]
-            week_mutation_rates = week_mutation_rates[week_filter, :]
-            month_inputs = month_inputs[month_filter, :]
-            month_mutation_rates = month_mutation_rates[month_filter, :]
+                    # filter inputs for population > 0
+                    alive_indices = split_temp_inputs[i][:, 2] > 0
+                    split_temp_inputs[i] = split_temp_inputs[i][
+                        alive_indices, :
+                    ]
+                    split_temp_mutation_rates[i] = split_temp_mutation_rates[
+                        i
+                    ][alive_indices, :]
 
-            # check if all inputs have finished (extinct)
-            day_extinct = len(day_inputs) == 0
-            week_extinct = len(week_inputs) == 0
-            month_extinct = len(month_inputs) == 0
+                    # add extinction day to outputs for population <= 0
+                    dead_indices = population[population[:, 1] <= 0, 0]
+                    if len(dead_indices) > 0:
+                        final_outputs[dead_indices] = day
 
-        return (
-            completed_days,
-            completed_weeks,
-            completed_months,
-        )  # temporary return, probably will write code to format this better in the future
+                    # check if this group has gone extinct
+                    is_extinct[i] = len(split_temp_inputs[i]) == 0
 
-    def run_emulation_step(
+            day += 1
+            if max_iters is not None and day > max_iters:
+                break
+
+        return final_outputs
+
+    def _run_emulation_step(
         self,
         X: np.ndarray,
         mutation_rates: np.ndarray,
@@ -208,26 +152,29 @@ class CoupledGPModel(IModel):
             mutation_rates (np.ndarray): mutation rate information in the case of a swap
 
         Returns:
-            Tuple[np.ndarray, np.ndarray, str]: tuple of (current output, next input, next emulator name)
+            Tuple[np.ndarray, np.ndarray, np.ndarray, str]: tuple of (current output, next input, next mutation rate, next emulator name)
         """
         if emulator_name == "population":
             emulator = self.pop_emukit
             swap_name = "drift"
-            input_function = ei.population_to_population
-            swap_function = ei.population_to_drift
+            input_function = population_to_population
+            swap_function = population_to_drift
         else:
             emulator = self.drift_emukit
             swap_name = "population"
-            input_function = ei.drift_to_drift
-            swap_function = ei.drift_to_population
-
-        Y = emulator.predict(X)[0]
+            input_function = drift_to_drift
+            swap_function = drift_to_population
+        Y = emulator.predict(X[:, 1:])[0]  # remove index from input
         if (day % coupling) == 0:
-            next_input = swap_function(X, Y, day, mutation_rates)
-            return Y, next_input, swap_name
+            next_input, next_mr, formatted_population = swap_function(
+                X, Y, day, mutation_rates
+            )
+            return formatted_population, next_input, next_mr, swap_name
         else:
-            next_input = input_function(X, Y, day, mutation_rates)
-            return Y, next_input, emulator_name
+            next_input, next_mr, formatted_population = input_function(
+                X, Y, day, mutation_rates
+            )
+            return formatted_population, next_input, next_mr, emulator_name
 
     def drift_sensitivity_analysis(
         self, graph_results: bool = True, save_plot: bool = False
@@ -281,11 +228,11 @@ class CoupledGPModel(IModel):
 
     @property
     def X(self) -> np.ndarray:
-        return self.X, self.drift_emukit.X, self.pop_emukit.X
+        return self.drift_emukit.X, self.pop_emukit.X
 
     @property
     def Y(self) -> np.ndarray:
-        return self.Y, self.drift_emukit.Y, self.pop_emukit.Y
+        return self.drift_emukit.Y, self.pop_emukit.Y
 
     @property
     def DriftModel(self) -> IModel:
@@ -296,8 +243,8 @@ class CoupledGPModel(IModel):
         return self.pop_emukit
 
     def save_models(self, drift_file, population_file):
-        np.save(drift_file, self.drift_emukit.gpy_model.param_array)
-        np.save(population_file, self.pop_emukit.model.param_array)
+        np.save(f"{drift_file}.npy", self.drift_emukit.gpy_model.param_array)
+        np.save(f"{population_file}.npy", self.pop_emukit.model.param_array)
 
     def load_models(self, drift_file, population_file):
         self.drift_emukit.gpy_model.update_model(False)

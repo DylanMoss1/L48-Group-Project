@@ -9,7 +9,7 @@ class PopulationModel(GP):
     Univariate Gaussian Process model for modelling population changes in the simulation.
 
     The trained model takes as input:
-     - the current day
+     - the current temperature
      - the current population
      - the current traits (mean values for size, speed, vision, and aggression)
     and outputs:

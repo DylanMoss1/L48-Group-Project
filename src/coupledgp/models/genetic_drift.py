@@ -3,7 +3,6 @@ from typing import List
 import numpy as np
 from GPy.util.multioutput import build_XY, build_likelihood, LCM
 from GPy.kern import RBF
-from Gpy.kern.src.coregionalize import Coregionalize
 from GPy.core.gp import GP
 
 
@@ -12,7 +11,7 @@ class GeneticDriftModel(GP):
     Multi-output Gaussian Process model for modelling genetic drift in the simulation.
 
     The trained model takes as input:
-     - the current day
+     - the current temperature
      - the current population
      - the current traits (mean values for size, speed, vision, and aggression)
      - the current mutation rates
@@ -30,16 +29,19 @@ class GeneticDriftModel(GP):
 
         # we model each output function f_d(x) as a linear combination of Q GPs with covariance k_q
         # thus, covariance is the sum of A_q k_q(x, x'), where we are chosing to keep k_q the same for all Q
-        latent_kern = RBF(X.shape[1] - 1)
         # we then define the combined multi-output covariance as an LCM with Q = 4 (num_outputs) and A = 1/2root(4)*N(0,1) + kI for all Q
         kernel = LCM(
             X.shape[1] - 1,
             self.num_outputs,
-            latent_kern,
+            [
+                RBF(X.shape[1] - 1),
+                RBF(X.shape[1] - 1),
+                RBF(X.shape[1] - 1),
+                RBF(X.shape[1] - 1),
+            ],
             W_rank=self.num_outputs,
         )
         likelihood = build_likelihood(Y_list, self.output_index, None)
-
         super().__init__(
             X,
             Y,
