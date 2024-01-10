@@ -30,7 +30,7 @@ INITIAL_AGGRESSION: 0.5
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
 FOOD_VALUE: 15
-DAMAGE_VALUE: 50
+DAMAGE_VALUE: 10
 
 # The amount of energy required to reproduce 
 REPRODUCTION_THRESHOLD: 20
