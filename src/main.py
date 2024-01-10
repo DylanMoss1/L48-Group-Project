@@ -9,10 +9,10 @@ if __name__ == "__main__":
     tiny_simulator = TinySimulator()
 
     mutation_rates = {
-        "size": 0.1,
+        "size": 0,
         "speed": 0,
         "vision": 0,
-        "aggression": 0,
+        "aggression": 0.1,
     }
 
     # mutation_start_point = {
