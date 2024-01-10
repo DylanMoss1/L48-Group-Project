@@ -506,7 +506,8 @@ class World:
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
-        print(temperature)
+        print(probability_of_food)
+        # print(temperature)
 
         for row in self.grid:
             for location in row:
@@ -765,18 +766,20 @@ class World:
 
         for row in self.grid:
             for location in row:
-                if len(location.species_list) > 0 and len(location.food_list) > 0:
-                    if len(location.species_list) == 1:
-                        for species in location.species_list:
+                active_list = [species for species in location.species_list if not species.hibernate]
+                # print(location.species_list, active_list)
+                if len(active_list) > 0 and len(location.food_list) > 0:
+                    if len(active_list) == 1:
+                        for species in active_list:
                             species.energy += len(location.food_list) * \
                                 food_value
                     else:
                         aggression = [
-                            species.aggression for species in location.species_list]
+                            species.aggression for species in active_list]
                         if all(aggr <= 0.5 for aggr in aggression):
-                            for species in location.species_list:
-                                species.energy += len(location.food_list) * food_value / \
-                                    len(location.species_list)
+                            for species in active_list:
+                                species.energy += len(active_list) * food_value / \
+                                    len(active_list)
                         else:
                             winner_hawk_indices = [
                                 i for i, j in enumerate(aggression)if j == max(aggression)]
@@ -787,9 +790,9 @@ class World:
                                     max_damage = 0
                             else:
                                 max_damage = max(aggression)
-                            winner_hawk = location.species_list[random.sample(
+                            winner_hawk = active_list[random.sample(
                                 winner_hawk_indices, 1)[0]].id
-                            for species in location.species_list:
+                            for species in active_list:
                                 if species.aggression > 0.5:
                                     if species.id == winner_hawk:
                                         species.energy += len(
