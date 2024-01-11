@@ -22,12 +22,14 @@ MAXIMUM_SPEED = simulation_constants["MAXIMUM_SPEED"]
 INITIAL_ENERGY = simulation_constants["INITIAL_ENERGY"]
 ENERGY_LOSS = simulation_constants["ENERGY_LOSS"]
 
-INITIAL_SIZE = simulation_constants["INITIAL_SIZE"]
-INITIAL_SPEED = simulation_constants["INITIAL_SPEED"]
-INITIAL_VISION = simulation_constants["INITIAL_VISION"]
-INITIAL_AGGRESSION = simulation_constants["INITIAL_AGGRESSION"]
+# INITIAL_SIZE = simulation_constants["INITIAL_SIZE"]
+# INITIAL_SPEED = simulation_constants["INITIAL_SPEED"]
+# INITIAL_VISION = simulation_constants["INITIAL_VISION"]
+# INITIAL_AGGRESSION = simulation_constants["INITIAL_AGGRESSION"]
 
 FOOD_VALUE = simulation_constants["FOOD_VALUE"]
 DAMAGE_VALUE = simulation_constants["DAMAGE_VALUE"]
 
 REPRODUCTION_THRESHOLD = simulation_constants["REPRODUCTION_THRESHOLD"]
+MAXIMUM_VISION = simulation_constants["MAXIMUM_VISION"]
+MAXIMUM_AGE = simulation_constants["MAXIMUM_AGE"]
