@@ -9,9 +9,9 @@ if __name__ == "__main__":
     tiny_simulator = TinySimulator()
 
     mutation_rates = {
-        "size": 0.1,
-        "speed": 0.1,
-        "vision": 0.1,
+        "size": 0,
+        "speed": 0,
+        "vision": 0,
         "aggression": 0.1,
     }
 
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     else:
         #days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(
          #   should_display_day=True, should_display_population=True), max_days=1000)
-        days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(should_display_day=True, should_display_population=True), max_days=2000)
+        days_survived, log = simulator.run(mutation_rates, debug_info=DebugInfo(should_display_day=True, should_display_population=True, should_display_traits=True), max_days=2000)
 
     print(log[-1])
 
