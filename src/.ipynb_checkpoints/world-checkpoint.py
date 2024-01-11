@@ -511,7 +511,7 @@ class World:
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
-        print(temperature,probability_of_food)
+        # print(temperature,probability_of_food)
 
         sum = 0
         for row in self.grid:
@@ -519,7 +519,7 @@ class World:
                 if random.random() < probability_of_food:
                     location.add_food()
                 sum += len(location.food_list)
-        print("Total food:", sum)
+        # print("Total food:", sum)
 
         return temperature, probability_of_food
 
