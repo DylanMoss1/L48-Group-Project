@@ -16,6 +16,7 @@ m_size = ContinuousParameter("m_size", 0, 1)
 m_speed = ContinuousParameter("m_speed", 0, 1)
 m_vision = ContinuousParameter("m_vision", 0, 1)
 m_aggression = ContinuousParameter("m_aggression", 0, 1)
+output = DiscreteParameter("output_index", [0, 1, 2, 3])
 # between a day and a month
 coupling = DiscreteParameter("coupling", [1, 7, 30])
 
@@ -41,6 +42,7 @@ drift_space = ParameterSpace(
         m_speed,
         m_vision,
         m_aggression,
+        output,
     ]
 )
 population_space = ParameterSpace(

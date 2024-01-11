@@ -29,7 +29,7 @@ def load_data_from_file(x_file_path, y_file_path):
 def format_data_for_drift_model(x, y):
     # convert day input to temperature
     x[:, 0] = day_to_temperature(x[:, 0])
-    X = [x for i in range(4)]
+    X = [x for _ in range(4)]
     Y = [y[:, 3 + i][..., None] for i in range(4)]
     return X, Y
 

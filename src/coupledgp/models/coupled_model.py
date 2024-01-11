@@ -176,8 +176,45 @@ class CoupledGPModel(IModel):
             )
             return formatted_population, next_input, next_mr, emulator_name
 
+    def plot_drift_model(self, save_plot: bool = True):
+        trait_names = ["size", "speed", "vision", "aggression"]
+
+        # plotting how changing one trait's mutation rate affects that trait's evolution
+        fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
+        for i in range(4):
+            self.drift_emukit.gpy_model.plot(
+                ax=axes[i],
+                fixed_inputs=[(0, 25), (10, i)],
+                visible_dims=[6 + i],
+            )
+            axes[i].set_xlabel("mutation_rate")
+            axes[i].set_ylabel(trait_names[i])
+
+        if save_plot:
+            fig.savefig("./src/coupledgp/tests/drift_plot_mr_w_25temp.svg")
+        plt.show()
+
+        # plotting how different trait mutation rates affect a trait's evolution
+
+    def plot_population_model(self, save_plot: bool = True):
+        trait_names = ["size", "speed", "vision", "aggression"]
+
+        # plotting how changing one trait affects the population over temperature
+        fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
+        for i in range(4):
+            for v in np.arange(0, 1, 0.1):
+                self.pop_emukit.model.plot(
+                    ax=axes[i], fixed_inputs=[(0, 25)], visible_dims=[2 + i]
+                )
+            axes[i].set_xlabel(trait_names[i])
+            axes[i].set_ylabel("population")
+
+        if save_plot:
+            fig.savefig("./src/coupledgp/tests/population_plot_trait_w_25temp")
+        plt.show()
+
     def drift_sensitivity_analysis(
-        self, graph_results: bool = True, save_plot: bool = False
+        self, graph_results: bool = True, save_plot: bool = True
     ):
         sensitivity = MonteCarloSensitivity(
             self.drift_emukit, self.drift_space
@@ -190,13 +227,16 @@ class CoupledGPModel(IModel):
             fig, axes = plt.subplots(1, 2)
             sns.barplot(main_effects, ax=axes[0])
             sns.barplot(total_effects, ax=axes[1])
+            axes[0].set_title("Main Effects")
+            axes[1].set_title("Total Effects")
 
             if save_plot:
-                fig.savefig("/drift_sensitivity.png")
+                fig.savefig("./src/coupledgp/tests/drift_sensitivity.svg")
+            plt.show()
         return main_effects, total_effects
 
     def population_sensitivity_analysis(
-        self, graph_results: bool = True, save_plot: bool = False
+        self, graph_results: bool = True, save_plot: bool = True
     ):
         sensitivity = MonteCarloSensitivity(self.pop_emukit, self.pop_space)
         main_effects, total_effects, _ = sensitivity.compute_effects(
@@ -207,9 +247,12 @@ class CoupledGPModel(IModel):
             fig, axes = plt.subplots(1, 2)
             sns.barplot(main_effects, ax=axes[0])
             sns.barplot(total_effects, ax=axes[1])
+            axes[0].set_title("Main Effects")
+            axes[1].set_title("Total Effects")
 
             if save_plot:
-                fig.savefig("/population_sensitivity.png")
+                fig.savefig("./src/coupledgp/tests/population_sensitivity.svg")
+            plt.show()
         return main_effects, total_effects
 
     def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
