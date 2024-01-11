@@ -13,11 +13,11 @@ def logitem_to_vector(item: LogItem):
             item.day,
             item.num_species_alive,
             item.temperature,
-            np.mean(item.traits_dict["size"]),
-            np.mean(item.traits_dict["speed"]),
-            np.mean(item.traits_dict["vision"]),
-            np.mean(item.traits_dict["aggression"]),
-            np.mean(item.traits_dict["energy"]),
+            np.median(item.traits_dict["size"]),
+            np.median(item.traits_dict["speed"]),
+            np.median(item.traits_dict["vision"]),
+            np.median(item.traits_dict["aggression"]),
+            np.median(item.traits_dict["energy"]),
         ]
     )
 

@@ -6,7 +6,10 @@ import seaborn as sns
 
 from GPy.util.multioutput import build_XY
 from emukit.core import ParameterSpace, DiscreteParameter, ContinuousParameter
-from emukit.sensitivity.monte_carlo import MonteCarloSensitivity
+from emukit.sensitivity.monte_carlo import (
+    ModelFreeMonteCarloSensitivity,
+    MonteCarloSensitivity,
+)
 from emukit.core.interfaces import IModel
 from emukit.model_wrappers import GPyModelWrapper, GPyMultiOutputWrapper
 
@@ -248,51 +251,46 @@ class CoupledGPModel(IModel):
             )
         plt.show()
 
-    def drift_sensitivity_analysis(
-        self, graph_results: bool = True, save_plot: bool = True
-    ):
-        sensitivity = MonteCarloSensitivity(
-            self.drift_emukit, self.drift_space
-        )
-        main_effects, total_effects, _ = sensitivity.compute_effects(
-            num_monte_carlo_points=10000
-        )
+    def drift_sensitivity_analysis(self, save_plot: bool = True):
+        # plot sensitivities per output
+        fig, axes = plt.subplots(4, 2, figsize=(20, 20))
+        for i in range(4):
+            sensitivity = ModelFreeMonteCarloSensitivity(
+                lambda x: self.drift_emukit.predict(
+                    np.append(x[:, :-1], np.full((x.shape[0], 1), i), axis=1)
+                )[0],
+                self.drift_space,
+            )
+            main_effects, total_effects, _ = sensitivity.compute_effects(
+                num_monte_carlo_points=10000
+            )
 
-        if graph_results:
-            fig, axes = plt.subplots(1, 2)
             sns.barplot(main_effects, ax=axes[0])
             sns.barplot(total_effects, ax=axes[1])
             axes[0].set_title("Main Effects")
             axes[1].set_title("Total Effects")
 
-            if save_plot:
-                fig.savefig(
-                    "./src/coupledgp/tests/plots/drift_sensitivity.svg"
-                )
-            plt.show()
-        return main_effects, total_effects
+        if save_plot:
+            fig.savefig("./src/coupledgp/tests/plots/drift_sensitivity.svg")
+        plt.show()
 
-    def population_sensitivity_analysis(
-        self, graph_results: bool = True, save_plot: bool = True
-    ):
+    def population_sensitivity_analysis(self, save_plot: bool = True):
         sensitivity = MonteCarloSensitivity(self.pop_emukit, self.pop_space)
         main_effects, total_effects, _ = sensitivity.compute_effects(
             num_monte_carlo_points=10000
         )
 
-        if graph_results:
-            fig, axes = plt.subplots(1, 2)
-            sns.barplot(main_effects, ax=axes[0])
-            sns.barplot(total_effects, ax=axes[1])
-            axes[0].set_title("Main Effects")
-            axes[1].set_title("Total Effects")
+        fig, axes = plt.subplots(1, 2)
+        sns.barplot(main_effects, ax=axes[0])
+        sns.barplot(total_effects, ax=axes[1])
+        axes[0].set_title("Main Effects")
+        axes[1].set_title("Total Effects")
 
-            if save_plot:
-                fig.savefig(
-                    "./src/coupledgp/tests/plots/population_sensitivity.svg"
-                )
-            plt.show()
-        return main_effects, total_effects
+        if save_plot:
+            fig.savefig(
+                "./src/coupledgp/tests/plots/population_sensitivity.svg"
+            )
+        plt.show()
 
     def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
         self.X = X

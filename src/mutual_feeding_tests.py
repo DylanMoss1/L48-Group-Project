@@ -11,11 +11,11 @@ from coupledgp import (
 )
 
 base_path = os.path.dirname(__file__)
-USE_DATA_PATH = True
+USE_DATA_PATH = False
 USE_MODEL_PATH = False
 
 TEST_PREDICTION = False
-VISUALIZE_RESULTS = True
+VISUALIZE_RESULTS = False
 TEST_SENSITIVITY = True
 
 # timing initialization
@@ -25,10 +25,11 @@ eval_times = dict()
 # generate training data
 if USE_DATA_PATH:
     X, Y = load_data_from_file(
-        "./src/coupledgp/tests/x-100.npy", "./src/coupledgp/tests/y-100.npy"
+        "./src/coupledgp/tests/x-100000.npy",
+        "./src/coupledgp/tests/y-100000.npy",
     )
 else:
-    X, Y = generate_data(100, "./src/coupledgp/tests/")
+    X, Y = generate_data(100000, "./src/coupledgp/tests/")
 generate_finished = time.time()
 eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 
@@ -72,8 +73,8 @@ eval_times["plotting"] = (
 
 # sensitivity analysis
 if TEST_SENSITIVITY:
-    model.population_sensitivity_analysis()
     model.drift_sensitivity_analysis()
+    model.population_sensitivity_analysis()
 sensitivity_finished = time.time()
 eval_times["sensitivity"] = (
     TEST_SENSITIVITY,
