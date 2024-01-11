@@ -178,39 +178,74 @@ class CoupledGPModel(IModel):
 
     def plot_drift_model(self, save_plot: bool = True):
         trait_names = ["size", "speed", "vision", "aggression"]
-
+        fixed_values = {
+            "temperature": 25,
+            "population": 2500,
+            "size": 0.5,
+            "speed": 0.5,
+            "vision": 0.5,
+            "aggression": 0.5,
+            "size_mr": 0.1,
+            "speed_mr": 0.1,
+            "vision_mr": 0.1,
+            "aggression_mr": 0.1,
+        }
         # plotting how changing one trait's mutation rate affects that trait's evolution
         fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
         for i in range(4):
+            fixed_inputs = [
+                (j, fixed_values[k])
+                for j, k in enumerate(fixed_values)
+                if j != 6 + i
+            ]
+            fixed_inputs.append((10, i))
             self.drift_emukit.gpy_model.plot(
                 ax=axes[i],
-                fixed_inputs=[(0, 25), (10, i)],
+                fixed_inputs=fixed_inputs,
                 visible_dims=[6 + i],
             )
             axes[i].set_xlabel("mutation_rate")
             axes[i].set_ylabel(trait_names[i])
+            axes[i].set_xlim(0, 1)
+            axes[i].set_ylim(0, 1)
 
         if save_plot:
-            fig.savefig("./src/coupledgp/tests/drift_plot_mr_w_25temp.svg")
+            fig.savefig(
+                "./src/coupledgp/tests/plots/drift_plot_mr_w_all_fixed.svg"
+            )
         plt.show()
 
         # plotting how different trait mutation rates affect a trait's evolution
 
     def plot_population_model(self, save_plot: bool = True):
         trait_names = ["size", "speed", "vision", "aggression"]
-
+        fixed_values = {
+            "temperature": 25,
+            "population": 2500,
+            "size": 0.5,
+            "speed": 0.5,
+            "vision": 0.5,
+            "aggression": 0.5,
+        }
         # plotting how changing one trait affects the population over temperature
         fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
         for i in range(4):
-            for v in np.arange(0, 1, 0.1):
-                self.pop_emukit.model.plot(
-                    ax=axes[i], fixed_inputs=[(0, 25)], visible_dims=[2 + i]
-                )
+            fixed_inputs = [
+                (j, fixed_values[k])
+                for j, k in enumerate(fixed_values)
+                if j != 2 + i
+            ]
+            self.pop_emukit.model.plot(
+                ax=axes[i], fixed_inputs=fixed_inputs, visible_dims=[2 + i]
+            )
             axes[i].set_xlabel(trait_names[i])
             axes[i].set_ylabel("population")
+            axes[i].set_xlim(0, 1)
 
         if save_plot:
-            fig.savefig("./src/coupledgp/tests/population_plot_trait_w_25temp")
+            fig.savefig(
+                "./src/coupledgp/tests/plots/population_plot_trait_w_all_fixed.svg"
+            )
         plt.show()
 
     def drift_sensitivity_analysis(
@@ -231,7 +266,9 @@ class CoupledGPModel(IModel):
             axes[1].set_title("Total Effects")
 
             if save_plot:
-                fig.savefig("./src/coupledgp/tests/drift_sensitivity.svg")
+                fig.savefig(
+                    "./src/coupledgp/tests/plots/drift_sensitivity.svg"
+                )
             plt.show()
         return main_effects, total_effects
 
@@ -251,7 +288,9 @@ class CoupledGPModel(IModel):
             axes[1].set_title("Total Effects")
 
             if save_plot:
-                fig.savefig("./src/coupledgp/tests/population_sensitivity.svg")
+                fig.savefig(
+                    "./src/coupledgp/tests/plots/population_sensitivity.svg"
+                )
             plt.show()
         return main_effects, total_effects
 

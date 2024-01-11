@@ -12,7 +12,7 @@ from coupledgp import (
 
 base_path = os.path.dirname(__file__)
 USE_DATA_PATH = True
-USE_MODEL_PATH = True
+USE_MODEL_PATH = False
 
 TEST_PREDICTION = False
 VISUALIZE_RESULTS = True
