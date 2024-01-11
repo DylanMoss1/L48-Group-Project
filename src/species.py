@@ -47,17 +47,34 @@ class Species:
         Stores the direction the species last moved in.
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
     """
-
-    def __init__(self, size=random.random(), speed=random.random(), vision=random.random(), aggression=random.random(), energy=initial_energy) -> None:
+    
+    def __init__(self, size=0.5, speed=0.5, vision=0.5, aggression=0.5, energy=initial_energy) -> None:
         """
         Initialise a Species object.
         """
 
         self.id = get_new_species_id()
-        self.size = size
-        self.speed = speed
-        self.vision = vision
-        self.aggression = aggression
+
+        if size: 
+            self.size = size 
+        else: 
+            self.size = random.random() 
+
+        if speed: 
+            self.speed = speed 
+        else: 
+            self.speed = random.random() 
+        
+        if vision: 
+            self.vision = vision 
+        else: 
+            self.vision = random.random() 
+
+        if aggression: 
+            self.aggression = aggression 
+        else: 
+            self.aggression = random.random() 
+
         self.energy = energy
         self.death = False
         self.last_moved_direction = None
@@ -109,7 +126,7 @@ class Species:
 
             fate = np.random.random()
 
-            if fate <= genetic_change / 10:
+            if fate <= genetic_change:
                 return None
 
             # # Consider genetic disorder due to mutation
