@@ -126,7 +126,7 @@ class Species:
 
             fate = np.random.random()
 
-            if fate <= genetic_change / 10:
+            if fate <= genetic_change:
                 return None
 
             # # Consider genetic disorder due to mutation
