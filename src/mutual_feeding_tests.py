@@ -6,17 +6,18 @@ from emukit.core.initial_designs.latin_design import LatinDesign
 from coupledgp import (
     generate_data,
     load_data_from_file,
-    coupled_space,
     CoupledGPModel,
 )
 
 base_path = os.path.dirname(__file__)
-USE_DATA_PATH = False
-USE_MODEL_PATH = False
+USE_DATA_PATH = True
+USE_MODEL_PATH = True
 
-TEST_PREDICTION = False
-VISUALIZE_RESULTS = False
+TEST_PREDICTION = True
+VISUALIZE_RESULTS = True
 TEST_SENSITIVITY = True
+
+SHOW_GRAPHS = False
 
 # timing initialization
 start_time = time.time()
@@ -25,11 +26,13 @@ eval_times = dict()
 # generate training data
 if USE_DATA_PATH:
     X, Y = load_data_from_file(
-        "./src/coupledgp/tests/x-100000.npy",
-        "./src/coupledgp/tests/y-100000.npy",
+        "./src/coupledgp/tests/x-sim-2.npy",
+        "./src/coupledgp/tests/y-sim-2.npy",
     )
 else:
-    X, Y = generate_data(100000, "./src/coupledgp/tests/")
+    X, Y = generate_data(
+        2, "./src/coupledgp/tests/"
+    )  # runs simulator for 500 days per sample (total 1000)
 generate_finished = time.time()
 eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 
@@ -51,20 +54,17 @@ eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 
 # predicting with coupled model
 if TEST_PREDICTION:
-    design = LatinDesign(coupled_space)
-    test_inputs = design.get_samples(5)
-    test_outputs = model.predict(test_inputs)
-    print(test_outputs)
+    model.plot_coupled_model(1000, show_plot=SHOW_GRAPHS)
 prediction_finished = time.time()
 eval_times["prediction"] = (
     TEST_PREDICTION,
-    prediction_finished - generate_finished,
+    prediction_finished - model_finished,
 )
 
 # visualizing model results
 if VISUALIZE_RESULTS:
-    model.plot_drift_model()
-    model.plot_population_model()
+    model.plot_drift_model(show_plot=SHOW_GRAPHS)
+    model.plot_population_model(show_plot=SHOW_GRAPHS)
 plotting_finished = time.time()
 eval_times["plotting"] = (
     VISUALIZE_RESULTS,
@@ -73,8 +73,8 @@ eval_times["plotting"] = (
 
 # sensitivity analysis
 if TEST_SENSITIVITY:
-    model.drift_sensitivity_analysis()
-    model.population_sensitivity_analysis()
+    model.drift_sensitivity_analysis(show_plot=SHOW_GRAPHS)
+    model.population_sensitivity_analysis(show_plot=SHOW_GRAPHS)
 sensitivity_finished = time.time()
 eval_times["sensitivity"] = (
     TEST_SENSITIVITY,
@@ -83,4 +83,6 @@ eval_times["sensitivity"] = (
 
 print("Evaluation times:")
 for k in eval_times:
-    print(f"{k} (shortcutted: {eval_times[k][0]}): {eval_times[k][1]}s")
+    print(
+        f"{k} (shortcutted: {eval_times[k][0]}, graphs: {SHOW_GRAPHS}): {eval_times[k][1]}s"
+    )

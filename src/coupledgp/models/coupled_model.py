@@ -1,11 +1,11 @@
 from dataclasses import dataclass
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
 from GPy.util.multioutput import build_XY
-from emukit.core import ParameterSpace, DiscreteParameter, ContinuousParameter
+from emukit.core.initial_designs.latin_design import LatinDesign
 from emukit.sensitivity.monte_carlo import (
     ModelFreeMonteCarloSensitivity,
     MonteCarloSensitivity,
@@ -16,6 +16,7 @@ from emukit.model_wrappers import GPyModelWrapper, GPyMultiOutputWrapper
 from ..utils import *
 from ..models.genetic_drift import GeneticDriftModel
 from ..models.population import PopulationModel
+from constants import NUM_INITIAL_SPECIES_FRACTION
 
 
 @dataclass
@@ -66,16 +67,19 @@ class CoupledGPModel(IModel):
         self.drift_space = drift_space
         self.pop_space = population_space
 
-    def predict(self, X: np.ndarray, max_iters: int = None) -> int:
+        # for plotting label purposes
+        self.trait_names = ["size", "speed", "vision", "aggression"]
+
+    def predict(self, X: np.ndarray, max_iters: int = None) -> np.ndarray:
         """
         Predicts the number of days until extinction by iteratively alternating between running the genetic drift emulator and the population emulator for a fixed number of time steps. The inputs of both emulators can either feed back into itself or feed forward into the each other.
 
         Args:
             X (np.ndarray): an array of inputs to predict in the form (n_samples x n_inputs) where the inputs are (population, m_size, m_speed, m_vision, m_aggression, coupling)
-            max_iters (int, optional): sets a hard limit on the number of iterations. Any unfinished simulations will have 0 as an output. Defaults to None.
+            max_iters (int, optional): sets a hard limit on the number of iterations. Any unfinished simulations will have max_iters as an output. Defaults to None.
 
         Returns:
-            int: the number of days until extinction
+            np.ndarra: the number of days until extinction for each input
         """
         # get unique coupling times from inputs
         coupling_times = np.unique(X[:, -1])
@@ -96,7 +100,9 @@ class CoupledGPModel(IModel):
         is_extinct = [False for _ in coupling_times]
         # convert coupled inputs to population inputs, following the simulator's method of initializing traits (random between 0 and 1)
         split_temp_inputs = [
-            coupled_to_population(x, day, np.random.rand(x.shape[0], 4))
+            coupled_to_population(
+                x, day, np.random.rand(x.shape[0], len(self.trait_names))
+            )
             for x in split_inputs
         ]
         # start emulation
@@ -127,7 +133,9 @@ class CoupledGPModel(IModel):
                     ][alive_indices, :]
 
                     # add extinction day to outputs for population <= 0
-                    dead_indices = population[population[:, 1] <= 0, 0]
+                    dead_indices = population[population[:, 1] <= 0, 0].astype(
+                        int
+                    )
                     if len(dead_indices) > 0:
                         final_outputs[dead_indices] = day
 
@@ -136,6 +144,7 @@ class CoupledGPModel(IModel):
 
             day += 1
             if max_iters is not None and day > max_iters:
+                final_outputs[final_outputs == 0] = max_iters
                 break
 
         return final_outputs
@@ -179,11 +188,12 @@ class CoupledGPModel(IModel):
             )
             return formatted_population, next_input, next_mr, emulator_name
 
-    def plot_drift_model(self, save_plot: bool = True):
-        trait_names = ["size", "speed", "vision", "aggression"]
+    def plot_drift_model(self, show_plot: bool = True, save_plot: bool = True):
+        """
+        Plots drift model fit for trait value vs. trait mutation rate for each trait across several temperatures (-5, 10 [optimal], 25), keeping all initial traits (0.5), all other mutation rates (0.1), and population (500) constant.
+        """
         fixed_values = {
-            "temperature": 25,
-            "population": 2500,
+            "population": NUM_INITIAL_SPECIES_FRACTION * (50 * 50),
             "size": 0.5,
             "speed": 0.5,
             "vision": 0.5,
@@ -193,68 +203,123 @@ class CoupledGPModel(IModel):
             "vision_mr": 0.1,
             "aggression_mr": 0.1,
         }
-        # plotting how changing one trait's mutation rate affects that trait's evolution
-        fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
-        for i in range(4):
-            fixed_inputs = [
-                (j, fixed_values[k])
-                for j, k in enumerate(fixed_values)
-                if j != 6 + i
-            ]
-            fixed_inputs.append((10, i))
-            self.drift_emukit.gpy_model.plot(
-                ax=axes[i],
-                fixed_inputs=fixed_inputs,
-                visible_dims=[6 + i],
-            )
-            axes[i].set_xlabel("mutation_rate")
-            axes[i].set_ylabel(trait_names[i])
+        temperatures = [-5, 10, 25]
+        fig, axes = plt.subplots(
+            len(self.trait_names), 1, sharex="all", figsize=(20, 20)
+        )
+        for i in range(len(self.trait_names)):
+            for t in temperatures:
+                fixed_inputs = [
+                    (j + 1, fixed_values[k])
+                    for j, k in enumerate(fixed_values)
+                    if (j + 1) != (6 + i)
+                ]
+                fixed_inputs.append((10, i))  # add output index
+                fixed_inputs.append((0, t))  # add temperature
+                self.drift_emukit.gpy_model.plot(
+                    ax=axes[i],
+                    fixed_inputs=fixed_inputs,
+                    visible_dims=[6 + i],
+                    label=f"temp: {t}",
+                )
+            axes[i].set_xlabel(f"{self.trait_names[i]} mr")
+            axes[i].set_ylabel(self.trait_names[i])
             axes[i].set_xlim(0, 1)
             axes[i].set_ylim(0, 1)
 
         if save_plot:
             fig.savefig(
-                "./src/coupledgp/tests/plots/drift_plot_mr_w_all_fixed.svg"
+                "./src/coupledgp/tests/plots/drift_plot_mr_w_rest_fixed.svg"
             )
-        plt.show()
+        if show_plot:
+            plt.show()
 
         # plotting how different trait mutation rates affect a trait's evolution
 
-    def plot_population_model(self, save_plot: bool = True):
-        trait_names = ["size", "speed", "vision", "aggression"]
+    def plot_population_model(
+        self, show_plot: bool = True, save_plot: bool = True
+    ):
+        """
+        Plots population model fit for population vs. trait value for each trait across several temperatures (-5, 10 [optimal], 25), keeping all other traits fixed at 0.5 and population fixed at 500.
+        """
         fixed_values = {
-            "temperature": 25,
-            "population": 2500,
+            "population": NUM_INITIAL_SPECIES_FRACTION * (50 * 50),
             "size": 0.5,
             "speed": 0.5,
             "vision": 0.5,
             "aggression": 0.5,
         }
-        # plotting how changing one trait affects the population over temperature
-        fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
-        for i in range(4):
-            fixed_inputs = [
-                (j, fixed_values[k])
-                for j, k in enumerate(fixed_values)
-                if j != 2 + i
-            ]
-            self.pop_emukit.model.plot(
-                ax=axes[i], fixed_inputs=fixed_inputs, visible_dims=[2 + i]
-            )
-            axes[i].set_xlabel(trait_names[i])
+        temperatures = [-5, 10, 25]
+        fig, axes = plt.subplots(
+            len(self.trait_names), 1, sharex="all", figsize=(20, 20)
+        )
+        for i in range(len(self.trait_names)):
+            for t in temperatures:
+                fixed_inputs = [
+                    (j + 1, fixed_values[k])
+                    for j, k in enumerate(fixed_values)
+                    if (j + 1) != 2 + i
+                ]
+                fixed_inputs.append((0, t))  # add temperature
+                self.pop_emukit.model.plot(
+                    ax=axes[i],
+                    fixed_inputs=fixed_inputs,
+                    visible_dims=[2 + i],
+                    label=f"temp: {t}",
+                )
+            axes[i].set_xlabel(self.trait_names[i])
             axes[i].set_ylabel("population")
             axes[i].set_xlim(0, 1)
 
         if save_plot:
             fig.savefig(
-                "./src/coupledgp/tests/plots/population_plot_trait_w_all_fixed.svg"
+                "./src/coupledgp/tests/plots/population_plot_trait_w_rest_fixed.svg"
             )
-        plt.show()
+        if show_plot:
+            plt.show()
 
-    def drift_sensitivity_analysis(self, save_plot: bool = True):
+    def plot_coupled_model(
+        self, n_samples: int, show_plot: bool = True, save_plot: bool = True
+    ):
+        """
+        Plots time until extinction vs. mutation rate for each mutation rate, keeping other mutation rates fixed at 0.1 and population fixed to 500 (default).
+
+        Args:
+            n_samples (int): Number of samples to use for each plot.
+        """
+        design = LatinDesign(coupled_space)
+        input_template = design.get_samples(n_samples)
+        # fix population to simulation initial population and coupling to 1
+        input_template[:, 0] = NUM_INITIAL_SPECIES_FRACTION * (50 * 50)
+        input_template[:, -1] = 1
+
+        fig, axes = plt.subplots(4, 1, sharex="all", figsize=(20, 20))
+        for i in range(len(self.trait_names)):
+            modified_input = input_template.copy()
+            modified_input[:, 1:5] = 0.1
+            modified_input[:, 1 + i] = input_template[:, 1 + i]
+
+            # run emulator for 1000 steps or until finished
+            outputs = self.predict(modified_input, max_iters=1000)
+            x = modified_input[:, 1 + i]  # mutation rate
+            y = outputs[:, 0]
+            axes[i].scatter(x, y)
+            axes[i].set_xlabel(f"{self.trait_names[i]} mr")
+            axes[i].set_ylabel("Days survived")
+
+        if save_plot:
+            fig.savefig(
+                "./src/coupledgp/tests/plots/coupled_plot_mr_w_rest_fixed"
+            )
+        if show_plot:
+            plt.show()
+
+    def drift_sensitivity_analysis(
+        self, show_plot: bool = True, save_plot: bool = True
+    ):
         # plot sensitivities per output
-        fig, axes = plt.subplots(4, 2, figsize=(20, 20))
-        for i in range(4):
+        fig, axes = plt.subplots(len(self.trait_names), 2, figsize=(20, 20))
+        for i in range(len(self.trait_names)):
             sensitivity = ModelFreeMonteCarloSensitivity(
                 lambda x: self.drift_emukit.predict(
                     np.append(x[:, :-1], np.full((x.shape[0], 1), i), axis=1)
@@ -265,16 +330,19 @@ class CoupledGPModel(IModel):
                 num_monte_carlo_points=10000
             )
 
-            sns.barplot(main_effects, ax=axes[0])
-            sns.barplot(total_effects, ax=axes[1])
-            axes[0].set_title("Main Effects")
-            axes[1].set_title("Total Effects")
+            sns.barplot(main_effects, ax=axes[i][0])
+            sns.barplot(total_effects, ax=axes[i][1])
+            axes[i][0].set_title(f"Main Effects ({self.trait_names[i]})")
+            axes[i][1].set_title(f"Total Effects ({self.trait_names[i]})")
 
         if save_plot:
             fig.savefig("./src/coupledgp/tests/plots/drift_sensitivity.svg")
-        plt.show()
+        if show_plot:
+            plt.show()
 
-    def population_sensitivity_analysis(self, save_plot: bool = True):
+    def population_sensitivity_analysis(
+        self, show_plot: bool = True, save_plot: bool = True
+    ):
         sensitivity = MonteCarloSensitivity(self.pop_emukit, self.pop_space)
         main_effects, total_effects, _ = sensitivity.compute_effects(
             num_monte_carlo_points=10000
@@ -290,7 +358,8 @@ class CoupledGPModel(IModel):
             fig.savefig(
                 "./src/coupledgp/tests/plots/population_sensitivity.svg"
             )
-        plt.show()
+        if show_plot:
+            plt.show()
 
     def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
         self.X = X
@@ -330,6 +399,7 @@ class CoupledGPModel(IModel):
         self.drift_emukit.gpy_model.update_model(False)
         self.drift_emukit.gpy_model[:] = np.load(drift_file)
         self.drift_emukit.gpy_model.update_model(True)
+
         self.pop_emukit.model.update_model(False)
         self.pop_emukit.model[:] = np.load(population_file)
         self.pop_emukit.model.update_model(True)

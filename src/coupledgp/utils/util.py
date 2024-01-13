@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 
 from world import LogItem
@@ -7,19 +8,25 @@ def day_to_temperature(day: np.array):
     return 10 + 18 * np.sin(2 * np.pi * day / 100) + (day / 100)
 
 
-def logitem_to_vector(item: LogItem):
-    return np.array(
+def logitems_to_vector(items: List[LogItem]):
+    result = np.vstack(
         [
-            item.day,
-            item.num_species_alive,
-            item.temperature,
-            np.median(item.traits_dict["size"]),
-            np.median(item.traits_dict["speed"]),
-            np.median(item.traits_dict["vision"]),
-            np.median(item.traits_dict["aggression"]),
-            np.median(item.traits_dict["energy"]),
+            np.array(
+                [
+                    item.day,
+                    item.num_species_alive,
+                    item.temperature,
+                    np.median(item.traits_dict["size"]),
+                    np.median(item.traits_dict["speed"]),
+                    np.median(item.traits_dict["vision"]),
+                    np.median(item.traits_dict["aggression"]),
+                    np.median(item.traits_dict["energy"]),
+                ]
+            )
+            for item in items
         ]
     )
+    return result
 
 
 def load_data_from_file(x_file_path, y_file_path):
