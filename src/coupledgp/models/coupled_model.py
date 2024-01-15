@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
 import os
-import tqdm
 from typing import Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -454,9 +453,14 @@ class CoupledGPModel(IModel):
         inputs = np.load(simulator_input_path)
         outputs = np.load(simulator_output_path)
         initial_population = 500
-        model_input = np.insert(
-            inputs, [0, -1], [initial_population, 1], axis=1
+        model_input = np.hstack(
+            [
+                np.full((inputs.shape[0], 1), initial_population),
+                inputs,
+                np.ones((inputs.shape[0], 1)),
+            ]
         )
+        print(model_input)
         model_output = self.predict(model_input)
         se = (model_output - outputs) ** 2
 

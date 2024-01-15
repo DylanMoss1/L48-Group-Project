@@ -11,7 +11,7 @@ from coupledgp import (
 
 base_path = os.path.dirname(__file__)
 USE_DATA_PATH = True
-USE_MODEL_PATH = False
+USE_MODEL_PATH = True
 
 TEST_PREDICTION = True
 VISUALIZE_RESULTS = True
@@ -26,8 +26,8 @@ eval_times = dict()
 # generate training data
 if USE_DATA_PATH:
     X, Y = load_data_from_file(
-        "./src/coupledgp/tests/x-sim-10-100.npy",
-        "./src/coupledgp/tests/y-sim-10-100.npy",
+        "./src/coupledgp/tests/x-sim-2.npy",
+        "./src/coupledgp/tests/y-sim-2.npy",
     )
 else:
     X, Y = generate_data(
@@ -40,8 +40,8 @@ eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 model = CoupledGPModel(X, Y)
 if USE_MODEL_PATH:
     model.load_models(
-        "./src/coupledgp/tests/drift_model_8.npy",
-        "./src/coupledgp/tests/population_model_8.npy",
+        "./src/coupledgp/tests/drift_model.npy",
+        "./src/coupledgp/tests/population_model.npy",
     )
 else:
     model.optimize()

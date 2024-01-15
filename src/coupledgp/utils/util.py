@@ -3,7 +3,7 @@ import numpy as np
 
 from world import LogItem
 
-NUM_TRAITS = 8
+NUM_TRAITS = 4
 
 
 def day_to_temperature(day: np.array):
