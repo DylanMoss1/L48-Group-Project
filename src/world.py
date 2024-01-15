@@ -3,7 +3,6 @@ from typing import Dict, Any, List
 from species import Species
 from food import Food
 import math
-from pprint import pprint
 from tabulate import tabulate
 from termcolor import colored
 import constants
@@ -830,7 +829,7 @@ class World:
                     species.energy -= energy_loss
                     maximum_stored_energy = reproduction_threshold + species.size * food_value * 10
                     species.energy = min(species.energy, maximum_stored_energy)
-    
+
     def species_age(self) -> None:
         """
         all creatures get older
@@ -841,7 +840,6 @@ class World:
                 for species in location.species_list:
                     species.age += 1
 
-    
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
