@@ -3,13 +3,16 @@ from pathlib import Path
 
 # Parse simulation_constants.yml as a python dictionary
 simulation_constants = yaml.safe_load(
-    Path('config/simulation_constants.yml').read_text())
+    Path("./src/config/simulation_constants.yml").read_text()
+)
 
 # Assign dictionary contents to python constant variables
 
-# -- SEE ./config/simulation_constants.yml FOR EXPLAINATIONS OF CONSTANTS -- 
+# -- SEE ./config/simulation_constants.yml FOR EXPLAINATIONS OF CONSTANTS --
 
-NUM_INITIAL_SPECIES_FRACTION = simulation_constants["NUM_INITIAL_SPECIES_FRACTION"]
+NUM_INITIAL_SPECIES_FRACTION = simulation_constants[
+    "NUM_INITIAL_SPECIES_FRACTION"
+]
 NUM_ACTIONS_PER_DAY = simulation_constants["NUM_ACTIONS_PER_DAY"]
 
 FOOD_PROBABILITY_SCALAR = simulation_constants["FOOD_PROBABILITY_SCALAR"]

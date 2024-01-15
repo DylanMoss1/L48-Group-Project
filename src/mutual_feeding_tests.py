@@ -11,7 +11,7 @@ from coupledgp import (
 
 base_path = os.path.dirname(__file__)
 USE_DATA_PATH = True
-USE_MODEL_PATH = True
+USE_MODEL_PATH = False
 
 TEST_PREDICTION = True
 VISUALIZE_RESULTS = True
@@ -26,13 +26,13 @@ eval_times = dict()
 # generate training data
 if USE_DATA_PATH:
     X, Y = load_data_from_file(
-        "./src/coupledgp/tests/x-sim-2.npy",
-        "./src/coupledgp/tests/y-sim-2.npy",
+        "./src/coupledgp/tests/x-sim-10-100.npy",
+        "./src/coupledgp/tests/y-sim-10-100.npy",
     )
 else:
     X, Y = generate_data(
-        2, "./src/coupledgp/tests/"
-    )  # runs simulator for 500 days per sample (total 1000)
+        10, 100, "./src/coupledgp/tests/"
+    )  # runs simulator for 100 days per sample (total 1000)
 generate_finished = time.time()
 eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 
@@ -40,18 +40,31 @@ eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 model = CoupledGPModel(X, Y)
 if USE_MODEL_PATH:
     model.load_models(
-        "./src/coupledgp/tests/drift_model.npy",
-        "./src/coupledgp/tests/population_model.npy",
+        "./src/coupledgp/tests/drift_model_8.npy",
+        "./src/coupledgp/tests/population_model_8.npy",
     )
 else:
     model.optimize()
     model.save_models(
-        "./src/coupledgp/tests/drift_model",
-        "./src/coupledgp/tests/population_model",
+        "./src/coupledgp/tests/drift_model_8",
+        "./src/coupledgp/tests/population_model_8",
     )
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 
+print("Evaluation times:")
+for k in eval_times:
+    print(
+        f"{k} (shortcutted: {eval_times[k][0]}, graphs: {SHOW_GRAPHS}): {eval_times[k][1]}s"
+    )
+
+print(
+    model.compare_with_simulator(
+        "./src/coupledgp/tests/mutation_rates.npy",
+        "./src/coupledgp/tests/simulated_years_of_survival.npy",
+    )
+)
+quit()
 # predicting with coupled model
 if TEST_PREDICTION:
     model.plot_coupled_model(1000, show_plot=SHOW_GRAPHS)
@@ -80,9 +93,3 @@ eval_times["sensitivity"] = (
     TEST_SENSITIVITY,
     sensitivity_finished - plotting_finished,
 )
-
-print("Evaluation times:")
-for k in eval_times:
-    print(
-        f"{k} (shortcutted: {eval_times[k][0]}, graphs: {SHOW_GRAPHS}): {eval_times[k][1]}s"
-    )

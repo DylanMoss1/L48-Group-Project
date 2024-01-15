@@ -12,6 +12,10 @@ size = ContinuousParameter("sz", 0, 1)
 speed = ContinuousParameter("spd", 0, 1)
 vision = ContinuousParameter("vsn", 0, 1)
 aggression = ContinuousParameter("agg", 0, 1)
+var_size = ContinuousParameter("var_sz", 0, 0.5)
+var_speed = ContinuousParameter("var_spd", 0, 0.5)
+var_vision = ContinuousParameter("var_vsn", 0, 0.5)
+var_aggression = ContinuousParameter("var_agg", 0, 0.5)
 m_size = ContinuousParameter("m_sz", 0, 0.5)
 m_speed = ContinuousParameter("m_spd", 0, 0.5)
 m_vision = ContinuousParameter("m_vsn", 0, 0.5)
@@ -38,6 +42,10 @@ drift_space = ParameterSpace(
         speed,
         vision,
         aggression,
+        var_size,
+        var_speed,
+        var_vision,
+        var_aggression,
         m_size,
         m_speed,
         m_vision,
@@ -46,7 +54,18 @@ drift_space = ParameterSpace(
     ]
 )
 population_space = ParameterSpace(
-    [temperature, population, size, speed, vision, aggression]
+    [
+        temperature,
+        population,
+        size,
+        speed,
+        vision,
+        aggression,
+        var_size,
+        var_speed,
+        var_vision,
+        var_aggression,
+    ]
 )
 
 training_space = ParameterSpace(
@@ -57,6 +76,10 @@ training_space = ParameterSpace(
         speed,
         vision,
         aggression,
+        var_size,
+        var_speed,
+        var_vision,
+        var_aggression,
         m_size,
         m_speed,
         m_vision,

@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from datetime import datetime
+import os
+import tqdm
 from typing import Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,6 +14,7 @@ from emukit.sensitivity.monte_carlo import (
     MonteCarloSensitivity,
 )
 from emukit.core.interfaces import IModel
+from emukit.core.optimization import GradientAcquisitionOptimizer
 from emukit.model_wrappers import GPyModelWrapper, GPyMultiOutputWrapper
 
 from ..utils import *
@@ -70,16 +74,19 @@ class CoupledGPModel(IModel):
         # for plotting label purposes
         self.trait_names = ["size", "speed", "vision", "aggression"]
 
-    def predict(self, X: np.ndarray, max_iters: int = None) -> np.ndarray:
+    def predict(
+        self, X: np.ndarray, n_samples: int = 1000, max_iters: int = None
+    ) -> np.ndarray:
         """
         Predicts the number of days until extinction by iteratively alternating between running the genetic drift emulator and the population emulator for a fixed number of time steps. The inputs of both emulators can either feed back into itself or feed forward into the each other.
 
         Args:
             X (np.ndarray): an array of inputs to predict in the form (n_samples x n_inputs) where the inputs are (population, m_size, m_speed, m_vision, m_aggression, coupling)
+            n_samples (int): number of iterations to run and average to propogate the variance
             max_iters (int, optional): sets a hard limit on the number of iterations. Any unfinished simulations will have max_iters as an output. Defaults to None.
 
         Returns:
-            np.ndarra: the number of days until extinction for each input
+            np.ndarray: the number of days until extinction for each input
         """
         # get unique coupling times from inputs
         coupling_times = np.unique(X[:, -1])
@@ -93,7 +100,8 @@ class CoupledGPModel(IModel):
         split_emulators = ["population" for _ in coupling_times]
 
         # initialize output arrays to 0 (final form is (n_samples x 1) array)
-        final_outputs = np.zeros((X.shape[0], 1))
+        final_means = np.zeros((X.shape[0], 1))
+        final_vars = np.zeros((X.shape[0], 1))
 
         day = 1
         # initialize arrays for execution loop
@@ -121,6 +129,7 @@ class CoupledGPModel(IModel):
                         split_emulators[i],
                         day,
                         t,
+                        n_samples,
                     )
 
                     # filter inputs for population > 0
@@ -137,17 +146,17 @@ class CoupledGPModel(IModel):
                         int
                     )
                     if len(dead_indices) > 0:
-                        final_outputs[dead_indices] = day
+                        final_means[dead_indices] = day
 
                     # check if this group has gone extinct
                     is_extinct[i] = len(split_temp_inputs[i]) == 0
 
             day += 1
             if max_iters is not None and day > max_iters:
-                final_outputs[final_outputs == 0] = max_iters
+                final_means[final_means == 0] = max_iters
                 break
 
-        return final_outputs
+        return final_means
 
     def _run_emulation_step(
         self,
@@ -156,6 +165,7 @@ class CoupledGPModel(IModel):
         emulator_name: str,
         day: int,
         coupling: int,
+        n_samples: int,
     ) -> Tuple[np.ndarray, np.ndarray, str]:
         """Runs a single emulation step.
 
@@ -176,7 +186,12 @@ class CoupledGPModel(IModel):
             swap_name = "population"
             input_function = drift_to_drift
             swap_function = drift_to_population
-        Y = emulator.predict(X[:, 1:])[0]  # remove index from input
+
+        sampled_X = np.tile(X, (n_samples, 1))
+        sampled_Y_mean, sampled_Y_var = emulator.predict(
+            X[:, 1:]
+        )  # remove index from input
+        Y = emulator.predict(X[:, 1:])[0]
         if (day % coupling) == 0:
             next_input, next_mr, formatted_population = swap_function(
                 X, Y, day, mutation_rates
@@ -229,7 +244,7 @@ class CoupledGPModel(IModel):
 
         if save_plot:
             fig.savefig(
-                "./src/coupledgp/tests/plots/drift_plot_mr_w_rest_fixed.svg"
+                f"./src/coupledgp/tests/plots/drift_plot_mr_w_rest_fixed_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
             )
         if show_plot:
             plt.show()
@@ -273,7 +288,7 @@ class CoupledGPModel(IModel):
 
         if save_plot:
             fig.savefig(
-                "./src/coupledgp/tests/plots/population_plot_trait_w_rest_fixed.svg"
+                f"./src/coupledgp/tests/plots/population_plot_trait_w_rest_fixed_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
             )
         if show_plot:
             plt.show()
@@ -309,7 +324,7 @@ class CoupledGPModel(IModel):
 
         if save_plot:
             fig.savefig(
-                "./src/coupledgp/tests/plots/coupled_plot_mr_w_rest_fixed"
+                f"./src/coupledgp/tests/plots/coupled_plot_mr_w_rest_fixed_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
             )
         if show_plot:
             plt.show()
@@ -336,7 +351,9 @@ class CoupledGPModel(IModel):
             axes[i][1].set_title(f"Total Effects ({self.trait_names[i]})")
 
         if save_plot:
-            fig.savefig("./src/coupledgp/tests/plots/drift_sensitivity.svg")
+            fig.savefig(
+                f"./src/coupledgp/tests/plots/drift_sensitivity_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
+            )
         if show_plot:
             plt.show()
 
@@ -356,7 +373,30 @@ class CoupledGPModel(IModel):
 
         if save_plot:
             fig.savefig(
-                "./src/coupledgp/tests/plots/population_sensitivity.svg"
+                f"./src/coupledgp/tests/plots/population_sensitivity_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
+            )
+        if show_plot:
+            plt.show()
+
+    def coupled_sensitivity_analysis(
+        self, show_plot: bool = True, save_plot: bool = True
+    ):
+        sensitivity = ModelFreeMonteCarloSensitivity(
+            lambda x: self.predict(x), coupled_space
+        )
+        main_effects, total_effects, _ = sensitivity.compute_effects(
+            num_monte_carlo_points=10000
+        )
+
+        fig, axes = plt.subplots(1, 2)
+        sns.barplot(main_effects, ax=axes[0])
+        sns.barplot(total_effects, ax=axes[1])
+        axes[0].set_title("Main Effects")
+        axes[1].set_title("Total Effects")
+
+        if save_plot:
+            fig.savefig(
+                f"./src/coupledgp/tests/plots/coupled_sensitivity_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
             )
         if show_plot:
             plt.show()
@@ -374,6 +414,54 @@ class CoupledGPModel(IModel):
     def optimize(self, verbose: bool = False) -> None:
         self.drift_emukit.optimize()
         self.pop_emukit.optimize()
+
+    # def optimize_acquisition(self, drift_acquisition, pop_acquisition, iterations = 1000):
+    #     file_path = 'coupledgp/training_logs/plot_mse_' + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+    #     os.makedirs(file_path)
+    #     x_plot = np.arange(0, iterations)
+    #     history = []
+
+    #     for i in tqdm(range(iterations)):
+    #         mse = self.compare_with_simulator()
+    #         history.append(mse)
+
+    #         drift_optimizer = GradientAcquisitionOptimizer(self.drift_space)
+    #         pop_optimizer = GradientAcquisitionOptimizer(self.pop_space)
+    #         x_drift_new, _ = drift_optimizer.optimize(drift_acquisition)
+    #         x_pop_new, _ = pop_optimizer.optimize(pop_acquisition)
+
+    #         print("Next positions to query:", x_drift_new, x_pop_new)
+    #         drift_acquisition.debug(np.array(x_drift_new))
+    #         pop_acquisition.debug(np.array(x_pop_new))
+    #         y_new = target_function_list(x_new)
+    #         X = np.append(X, x_new, axis=0)
+    #         Y = np.append(Y, y_new, axis=0)
+    #         print(x_new, y_new)
+    #         model_emukit.set_data(X, Y)
+    #         plt.savefig(file_path + '/' + str(i) +'.png')
+    #         plt.clf()
+    #         figure, axis = plt.subplots(1, 2, figsize=(20, 6))
+    #         with open(file_path + '/history.npy', 'wb') as f:
+    #             np.save(f, np.array(history))
+    #     return history
+
+    def compare_with_simulator(
+        self,
+        simulator_input_path="dataset_test/mutation_rates.npy",
+        simulator_output_path="dataset_test/simulated_years_of_survival.npy",
+    ):
+        """Inputs in (n_samples, 4), outputs in (n_samples, 1)"""
+        inputs = np.load(simulator_input_path)
+        outputs = np.load(simulator_output_path)
+        initial_population = 500
+        model_input = np.insert(
+            inputs, [0, -1], [initial_population, 1], axis=1
+        )
+        model_output = self.predict(model_input)
+        se = (model_output - outputs) ** 2
+
+        mse = np.mean(se)
+        return mse
 
     @property
     def X(self) -> np.ndarray:

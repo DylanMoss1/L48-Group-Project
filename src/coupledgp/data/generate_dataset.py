@@ -7,7 +7,7 @@ from world import DebugInfo
 from ..utils import logitems_to_vector, training_space
 
 
-def generate_data(n_samples: int, save_location: str = None):
+def generate_data(n_samples: int, n_steps: int, save_location: str = None):
     """
     Generates training data based on single-timestep results
 
@@ -19,24 +19,25 @@ def generate_data(n_samples: int, save_location: str = None):
     design = LatinDesign(parameter_space)
     X = design.get_samples(n_samples)  # shape (n_samples x num_inputs)
     X, Y = simulate(
-        X
+        X, n_steps
     )  # shape (n_samples * 500~ish x n_outputs) for Y (need to add in X inputs from sim to match shape)
 
     if save_location is None:
         save_location = ""
     np.save(
-        f"{save_location}x-sim-{n_samples}",
+        f"{save_location}x-sim-{n_samples}-{n_steps}",
         X,
     )
     np.save(
-        f"{save_location}y-sim-{n_samples}",
+        f"{save_location}y-sim-{n_samples}-{n_steps}",
         Y,
     )
 
     return X, Y
 
 
-def simulate(X):
+def simulate(X, n_steps):
+    """X in the form (day, population, size, speed, vision, aggression, var_size, var_speed, var_vision, var_aggression, m_size, m_speed, m_vision, m_aggression)"""
     simulator = MainSimulator()
     all_inputs = []
     all_results = []
@@ -44,32 +45,27 @@ def simulate(X):
         sim_results = logitems_to_vector(
             simulator.run_from_start_point(  # input in the form (day, population, m1, ..., m4, t1, ..., t4)
                 mutation_rates={
-                    "size": inputs[2],
-                    "speed": inputs[3],
-                    "vision": inputs[4],
-                    "aggression": inputs[5],
+                    "size": inputs[10],
+                    "speed": inputs[11],
+                    "vision": inputs[12],
+                    "aggression": inputs[13],
                 },
                 day_start_point=inputs[0],
                 population_start_point=inputs[1],
                 mutation_start_point={
-                    "size": (inputs[6], 0),
-                    "speed": (inputs[7], 0),
-                    "vision": (inputs[8], 0),
-                    "aggression": (inputs[9], 0),
+                    "size": (inputs[2], inputs[6]),
+                    "speed": (inputs[3], inputs[7]),
+                    "vision": (inputs[4], inputs[8]),
+                    "aggression": (inputs[5], inputs[9]),
                 },
-                debug_info=DebugInfo(
-                    period=10,
-                    should_display_day=True,
-                    should_display_population=True,
-                ),
-                max_days=inputs[0] + 500,
+                max_days=inputs[0] + n_steps,
             )[
                 1
             ]
         )
-        sim_inputs = sim_results[
-            :-1, [0, 1, 3, 4, 5, 6]
-        ]  # inputs are previous day's output for sim
+        sim_inputs = np.delete(sim_results, 2, 1)[
+            :-1, :
+        ]  # inputs are previous day's output for sim (minus temperature)
         sim_inputs = np.insert(
             sim_inputs,
             [2],

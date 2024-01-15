@@ -429,14 +429,14 @@ class World:
         for species_x, species_y in species_location_set:
 
             # Add new species instances at every location in the set
-            size = normal(
-                loc=mutation_start_point["size"][0], scale=mutation_start_point["size"][1])
-            speed = normal(
-                loc=mutation_start_point["speed"][0], scale=mutation_start_point["speed"][1])
-            vision = normal(
-                loc=mutation_start_point["vision"][0], scale=mutation_start_point["vision"][1])
-            aggression = normal(
-                loc=mutation_start_point["aggression"][0], scale=mutation_start_point["aggression"][1])
+            size = min(1, max(0, normal(
+                loc=mutation_start_point["size"][0], scale=mutation_start_point["size"][1])))
+            speed = min(1, max(0, normal(
+                loc=mutation_start_point["speed"][0], scale=mutation_start_point["speed"][1])))
+            vision = min(1, max(0, normal(
+                loc=mutation_start_point["vision"][0], scale=mutation_start_point["vision"][1])))
+            aggression = min(1, max(0, normal(
+                loc=mutation_start_point["aggression"][0], scale=mutation_start_point["aggression"][1])))
 
             self.grid[species_y][species_x].add_species(
                 Species(size=size, speed=speed, vision=vision, aggression=aggression))
