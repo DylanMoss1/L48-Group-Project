@@ -505,7 +505,7 @@ class World:
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
-        # print(probability_of_food)
+        print(probability_of_food)
 
         for row in self.grid:
             for location in row:
