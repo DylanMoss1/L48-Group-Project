@@ -1,5 +1,5 @@
 import numpy as np
-from GPy.kern import RBF
+from GPy.kern import Linear, RBF
 from GPy.likelihoods import Gaussian
 from GPy.core.gp import GP
 
@@ -21,8 +21,12 @@ class PopulationModel(GP):
     """
 
     def __init__(self, X: np.array, Y: np.array):
-        # we just use a standard RBF kernel and Gaussian likelihood
-        kernel = RBF(X.shape[1])
+                
+        current_population_kernel = Linear(X.shape[1], active_dims=[1])
+        remaining_inputs_kernel = RBF(X.shape[1], lengthscale=0.1, variance=1, active_dims=[i for i in range(len(X)) if i != 1])
+
+        kernel = current_population_kernel + remaining_inputs_kernel
+
         likelihood = Gaussian(variance=1.0)
 
         super().__init__(X, Y, kernel, likelihood, name="Population Model")

@@ -11,7 +11,7 @@ from coupledgp import (
 
 base_path = os.path.dirname(__file__)
 USE_DATA_PATH = True
-USE_MODEL_PATH = True
+USE_MODEL_PATH = False
 
 TEST_PREDICTION = True
 VISUALIZE_RESULTS = True
@@ -46,8 +46,8 @@ if USE_MODEL_PATH:
 else:
     model.optimize()
     model.save_models(
-        "./src/coupledgp/tests/drift_model_8",
-        "./src/coupledgp/tests/population_model_8",
+        "./src/coupledgp/tests/drift_model_custom_kernel_2",
+        "./src/coupledgp/tests/population_model_custom_kernel_2",
     )
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
@@ -64,7 +64,8 @@ print(
         "./src/coupledgp/tests/simulated_years_of_survival.npy",
     )
 )
-quit()
+# quit()
+
 # predicting with coupled model
 if TEST_PREDICTION:
     model.plot_coupled_model(1000, show_plot=SHOW_GRAPHS)
