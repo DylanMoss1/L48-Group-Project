@@ -11,7 +11,7 @@ from coupledgp import (
 
 base_path = os.path.dirname(__file__)
 USE_DATA_PATH = True
-USE_MODEL_PATH = True
+USE_MODEL_PATH = False
 
 TEST_PREDICTION = True
 VISUALIZE_RESULTS = True
@@ -52,19 +52,8 @@ else:
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 
-print("Evaluation times:")
-for k in eval_times:
-    print(
-        f"{k} (shortcutted: {eval_times[k][0]}, graphs: {SHOW_GRAPHS}): {eval_times[k][1]}s"
-    )
+print(model.compare_with_simulator())
 
-print(
-    model.compare_with_simulator(
-        "./src/coupledgp/tests/mutation_rates.npy",
-        "./src/coupledgp/tests/simulated_years_of_survival.npy",
-    )
-)
-quit()
 # predicting with coupled model
 if TEST_PREDICTION:
     model.plot_coupled_model(1000, show_plot=SHOW_GRAPHS)
@@ -74,6 +63,13 @@ eval_times["prediction"] = (
     prediction_finished - model_finished,
 )
 
+print("Evaluation times:")
+for k in eval_times:
+    print(
+        f"{k} (shortcutted: {eval_times[k][0]}, graphs: {SHOW_GRAPHS}): {eval_times[k][1]}s"
+    )
+
+quit()
 # visualizing model results
 if VISUALIZE_RESULTS:
     model.plot_drift_model(show_plot=SHOW_GRAPHS)

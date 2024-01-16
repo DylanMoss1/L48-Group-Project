@@ -74,133 +74,205 @@ class CoupledGPModel(IModel):
         self.trait_names = ["size", "speed", "vision", "aggression"]
 
     def predict(
-        self, X: np.ndarray, n_samples: int = 1000, max_iters: int = None
+        self,
+        X: np.ndarray,
+        n_samples: int = 1000,
+        max_iters: int = None,
+        seed: int = 0,
     ) -> np.ndarray:
         """
-        Predicts the number of days until extinction by iteratively alternating between running the genetic drift emulator and the population emulator for a fixed number of time steps. The inputs of both emulators can either feed back into itself or feed forward into the each other.
+        Predicts the number of days until extinction by iteratively alternating between running the genetic drift emulator and the population emulator for a fixed number of time steps. The inputs of both emulators feed forward into each other.
 
         Args:
-            X (np.ndarray): an array of inputs to predict in the form (n_samples x n_inputs) where the inputs are (population, m_size, m_speed, m_vision, m_aggression, coupling)
+            X (np.ndarray): an array of inputs to predict in the form (n_inputs x [population, m_size, m_speed, m_vision, m_aggression])
             n_samples (int): number of iterations to run and average to propogate the variance
             max_iters (int, optional): sets a hard limit on the number of iterations. Any unfinished simulations will have max_iters as an output. Defaults to None.
+            seed (int): sets the random seed
 
         Returns:
-            np.ndarray: the number of days until extinction for each input
+            Tuple[np.ndarray, np.ndarray]: the mean and variance for the number of days until extinction for each input
         """
-        # get unique coupling times from inputs
-        coupling_times = np.unique(X[:, -1])
-        # adds input indices at the beginning for filtering
+        # initializes random generator
+        rng = np.random.default_rng(seed)
+        # adds input indices at the beginning for distinguishing inputs
         X = np.insert(X, [0], np.arange(X.shape[0])[:, None], axis=1)
-        # split input array based on coupling values and remove them from inputs
-        split_inputs = [X[X[:, -1] == t, :-1] for t in coupling_times]
         # store mutation rates for input conversions
-        split_temp_mutation_rates = [x[:, 2:6] for x in split_inputs]
-        # start emulation with changes in population
-        split_emulators = ["population" for _ in coupling_times]
+        mutation_rates = X[:, 2:]
 
-        # initialize output arrays to 0 (final form is (n_samples x 1) array)
-        final_means = np.zeros((X.shape[0], 1))
-        final_vars = np.zeros((X.shape[0], 1))
+        # initialize output arrays to 0 (final form is (n_inputs x n_samples) array)
+        final_extinction_days = np.zeros((X.shape[0], n_samples))
 
+        ## prepare inputs for emulation
+        # repeat n_sample times to represent drawing from a trait uniform distribution n_sample times (different trait values)
+        X = np.tile(X, (n_samples, 1))
+        traits = rng.uniform(0, 1, (X.shape[0], NUM_TRAITS))
+        # add indices to identify emulation run
+        X = np.insert(
+            X, [1], np.arange(X.shape[0])[:, None] % n_samples, axis=1
+        )
+        # convert coupled inputs to population inputs
+        X = coupled_to_population(X, 1, traits)
+
+        # initialize execution loop
         day = 1
-        # initialize arrays for execution loop
-        is_extinct = [False for _ in coupling_times]
-        # convert coupled inputs to population inputs, following the simulator's method of initializing traits (random between 0 and 1)
-        split_temp_inputs = [
-            coupled_to_population(
-                x, day, np.random.rand(x.shape[0], len(self.trait_names))
-            )
-            for x in split_inputs
-        ]
+        is_all_extinct = False
         # start emulation
-        while not all(is_extinct):
-            for i, t in enumerate(coupling_times):
-                if not is_extinct[i]:
-                    # run emulation step only for inputs with population > 0
-                    (
-                        population,
-                        split_temp_inputs[i],
-                        split_temp_mutation_rates[i],
-                        split_emulators[i],
-                    ) = self._run_emulation_step(
-                        split_temp_inputs[i],
-                        split_temp_mutation_rates[i],
-                        split_emulators[i],
-                        day,
-                        t,
-                        n_samples,
-                    )
+        while not is_all_extinct:
+            # run emulation step for non-extinct inputs
+            X = self._run_emulation_step(
+                X, mutation_rates, day, n_samples, rng
+            )
 
-                    # filter inputs for population > 0
-                    alive_indices = split_temp_inputs[i][:, 2] > 0
-                    split_temp_inputs[i] = split_temp_inputs[i][
-                        alive_indices, :
-                    ]
-                    split_temp_mutation_rates[i] = split_temp_mutation_rates[
-                        i
-                    ][alive_indices, :]
+            # wrap input variance samples to do checks (n_inputs x 12 x n_samples)
+            wrapped_inputs = np.dstack(np.vsplit(X, n_samples))
+            # get population values (tuple of (input_index, sample_index) pairs)
+            for row_index, depth_index in np.where(
+                wrapped_inputs[:, 3, :] <= 0
+            ):
+                input_index = wrapped_inputs[row_index, 0, depth_index]
+                sample_index = wrapped_inputs[row_index, 1, depth_index]
+                if (
+                    final_extinction_days[input_index, sample_index] == 0
+                ):  # i.e., new extinction
+                    final_extinction_days[input_index, sample_index] = day
+            # remove any fully extinct input rows
+            fully_extinct_rows = np.nonzero(
+                np.all(final_extinction_days, axis=1)
+            )[0]
+            for row_index in fully_extinct_rows:
+                wrapped_inputs = np.delete(
+                    wrapped_inputs,
+                    np.where(wrapped_inputs[:, 0, :] == row_index)[0],
+                    axis=0,
+                )
+            # unwrap samples
+            X = np.vstack(np.dsplit(wrapped_inputs, n_samples))
 
-                    # add extinction day to outputs for population <= 0
-                    dead_indices = population[population[:, 1] <= 0, 0].astype(
-                        int
-                    )
-                    if len(dead_indices) > 0:
-                        final_means[dead_indices] = day
-
-                    # check if this group has gone extinct
-                    is_extinct[i] = len(split_temp_inputs[i]) == 0
-
+            # book-keeping at the end
             day += 1
+            is_all_extinct = np.all(final_extinction_days)
             if max_iters is not None and day > max_iters:
-                final_means[final_means == 0] = max_iters
+                final_extinction_days[final_extinction_days == 0] = max_iters
                 break
 
-        return final_means
+        final_means = np.mean(final_extinction_days, axis=1)
+        final_vars = np.var(final_extinction_days, axis=1)
+        return final_means, final_vars
 
     def _run_emulation_step(
         self,
-        X: np.ndarray,
+        pop_X: np.ndarray,
         mutation_rates: np.ndarray,
-        emulator_name: str,
         day: int,
-        coupling: int,
         n_samples: int,
+        rng: np.random.Generator,
     ) -> Tuple[np.ndarray, np.ndarray, str]:
-        """Runs a single emulation step.
+        """Runs a single day of emulation (population -> drift ->)
 
         Args:
-            X (np.ndarray): input of the current emulation step
-            mutation_rates (np.ndarray): mutation rate information in the case of a swap
+            pop_X (np.ndarray): input of the current emulation step (population emulator).
+                This is in the form ([n_inputs * n_samples] x [input_index, sample_index, temperature, population, size, speed, vision, aggression, size_var, speed_var, vision_var, aggression_var]).
+            mutation_rates (np.ndarray): mutation rate information for swapping to drift inputs
+                This is in the form (n_inputs x 4)
 
         Returns:
-            Tuple[np.ndarray, np.ndarray, np.ndarray, str]: tuple of (current output, next input, next mutation rate, next emulator name)
+            np.ndarray: next (population) input
         """
-        if emulator_name == "population":
-            emulator = self.pop_emukit
-            swap_name = "drift"
-            input_function = population_to_population
-            swap_function = population_to_drift
-        else:
-            emulator = self.drift_emukit
-            swap_name = "population"
-            input_function = drift_to_drift
-            swap_function = drift_to_population
-
-        sampled_X = np.tile(X, (n_samples, 1))
-        sampled_Y_mean, sampled_Y_var = emulator.predict(
-            X[:, 1:]
+        print(pop_X.shape)
+        sampled_Y_mean, sampled_Y_var = self.pop_emukit.predict(
+            pop_X[:, 2:]
         )  # remove index from input
-        Y = emulator.predict(X[:, 1:])[0]
-        if (day % coupling) == 0:
-            next_input, next_mr, formatted_population = swap_function(
-                X, Y, day, mutation_rates
-            )
-            return formatted_population, next_input, next_mr, swap_name
-        else:
-            next_input, next_mr, formatted_population = input_function(
-                X, Y, day, mutation_rates
-            )
-            return formatted_population, next_input, next_mr, emulator_name
+        Y_mean = np.mean(
+            np.hstack(np.split(sampled_Y_mean, n_samples, axis=0)), axis=0
+        )
+        Y_var = np.sum(
+            (np.hstack(np.split(sampled_Y_var, n_samples, axis=0)) / n_samples)
+            ** 2,
+            axis=0,
+        )
+
+        drift_X = population_to_drift(
+            pop_X, Y_mean, Y_var, day, n_samples, rng, mutation_rates
+        )
+        sampled_Y_mean, sampled_Y_var = self.pop_emukit.predict(drift_X[:, 2:])
+        Y_mean = np.mean(
+            np.hstack(np.split(sampled_Y_mean, n_samples, axis=0)), axis=0
+        )
+        Y_var = np.sum(
+            (np.hstack(np.split(sampled_Y_var, n_samples, axis=0)) / n_samples)
+            ** 2,
+            axis=0,
+        )
+
+        pop_X = drift_to_population(
+            drift_X, Y_mean, Y_var, day, n_samples, rng
+        )
+        return pop_X
+
+    def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
+        self.X = X
+        self.Y = Y
+        x_list, y_list = format_data_for_drift_model(X, Y)
+        x_drift, y_drift, _ = build_XY(x_list, y_list)
+        x_pop, y_pop = format_data_for_population_model(X, Y)
+
+        self.drift_emukit.set_data(x_drift, y_drift)
+        self.pop_emukit.set_data(x_pop, y_pop)
+
+    def optimize(self, verbose: bool = False) -> None:
+        self.drift_emukit.optimize()
+        self.pop_emukit.optimize()
+
+    def compare_with_simulator(
+        self,
+        simulator_input_path="./src/dataset_test/mutation_rates.npy",
+        simulator_output_path="./src/dataset_test/simulated_years_of_survival.npy",
+    ):
+        """Inputs in (n_samples, 4), outputs in (n_samples, 1)"""
+        inputs = np.load(simulator_input_path)
+        outputs = np.load(simulator_output_path)
+        initial_population = 500
+        model_input = np.hstack(
+            [
+                np.full((inputs.shape[0], 1), initial_population),
+                inputs,
+                np.ones((inputs.shape[0], 1)),
+            ]
+        )
+        model_output, _ = self.predict(model_input)
+        se = (model_output - outputs) ** 2
+
+        mse = np.mean(se)
+        return mse
+
+    @property
+    def X(self) -> np.ndarray:
+        return self.drift_emukit.X, self.pop_emukit.X
+
+    @property
+    def Y(self) -> np.ndarray:
+        return self.drift_emukit.Y, self.pop_emukit.Y
+
+    @property
+    def DriftModel(self) -> IModel:
+        return self.drift_emukit
+
+    @property
+    def PopulationModel(self) -> IModel:
+        return self.pop_emukit
+
+    def save_models(self, drift_file, population_file):
+        np.save(f"{drift_file}.npy", self.drift_emukit.gpy_model.param_array)
+        np.save(f"{population_file}.npy", self.pop_emukit.model.param_array)
+
+    def load_models(self, drift_file, population_file):
+        self.drift_emukit.gpy_model.update_model(False)
+        self.drift_emukit.gpy_model[:] = np.load(drift_file)
+        self.drift_emukit.gpy_model.update_model(True)
+
+        self.pop_emukit.model.update_model(False)
+        self.pop_emukit.model[:] = np.load(population_file)
+        self.pop_emukit.model.update_model(True)
 
     def plot_drift_model(self, show_plot: bool = True, save_plot: bool = True):
         """
@@ -247,8 +319,6 @@ class CoupledGPModel(IModel):
             )
         if show_plot:
             plt.show()
-
-        # plotting how different trait mutation rates affect a trait's evolution
 
     def plot_population_model(
         self, show_plot: bool = True, save_plot: bool = True
@@ -314,10 +384,15 @@ class CoupledGPModel(IModel):
             modified_input[:, 1 + i] = input_template[:, 1 + i]
 
             # run emulator for 1000 steps or until finished
-            outputs = self.predict(modified_input, max_iters=1000)
+            mean, var = self.predict(modified_input, max_iters=1000)
             x = modified_input[:, 1 + i]  # mutation rate
-            y = outputs[:, 0]
-            axes[i].scatter(x, y)
+            y_mean = mean[:, 0]
+            y_std = np.sqrt(var)[:, 0]
+            axes[i].plot(x, y_mean)
+            axes[i].fill_between(x, y_mean + y_std, y_mean - y_std, alpha=0.6)
+            axes[i].fill_between(
+                x, y_mean + 2 * y_std, y_mean - 2 * y_std, alpha=0.4
+            )
             axes[i].set_xlabel(f"{self.trait_names[i]} mr")
             axes[i].set_ylabel("Days survived")
 
@@ -380,9 +455,7 @@ class CoupledGPModel(IModel):
     def coupled_sensitivity_analysis(
         self, show_plot: bool = True, save_plot: bool = True
     ):
-        sensitivity = ModelFreeMonteCarloSensitivity(
-            lambda x: self.predict(x), coupled_space
-        )
+        sensitivity = MonteCarloSensitivity(self, coupled_space)
         main_effects, total_effects, _ = sensitivity.compute_effects(
             num_monte_carlo_points=10000
         )
@@ -399,99 +472,3 @@ class CoupledGPModel(IModel):
             )
         if show_plot:
             plt.show()
-
-    def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
-        self.X = X
-        self.Y = Y
-        x_list, y_list = format_data_for_drift_model(X, Y)
-        x_drift, y_drift, _ = build_XY(x_list, y_list)
-        x_pop, y_pop = format_data_for_population_model(X, Y)
-
-        self.drift_emukit.set_data(x_drift, y_drift)
-        self.pop_emukit.set_data(x_pop, y_pop)
-
-    def optimize(self, verbose: bool = False) -> None:
-        self.drift_emukit.optimize()
-        self.pop_emukit.optimize()
-
-    # def optimize_acquisition(self, drift_acquisition, pop_acquisition, iterations = 1000):
-    #     file_path = 'coupledgp/training_logs/plot_mse_' + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    #     os.makedirs(file_path)
-    #     x_plot = np.arange(0, iterations)
-    #     history = []
-
-    #     for i in tqdm(range(iterations)):
-    #         mse = self.compare_with_simulator()
-    #         history.append(mse)
-
-    #         drift_optimizer = GradientAcquisitionOptimizer(self.drift_space)
-    #         pop_optimizer = GradientAcquisitionOptimizer(self.pop_space)
-    #         x_drift_new, _ = drift_optimizer.optimize(drift_acquisition)
-    #         x_pop_new, _ = pop_optimizer.optimize(pop_acquisition)
-
-    #         print("Next positions to query:", x_drift_new, x_pop_new)
-    #         drift_acquisition.debug(np.array(x_drift_new))
-    #         pop_acquisition.debug(np.array(x_pop_new))
-    #         y_new = target_function_list(x_new)
-    #         X = np.append(X, x_new, axis=0)
-    #         Y = np.append(Y, y_new, axis=0)
-    #         print(x_new, y_new)
-    #         model_emukit.set_data(X, Y)
-    #         plt.savefig(file_path + '/' + str(i) +'.png')
-    #         plt.clf()
-    #         figure, axis = plt.subplots(1, 2, figsize=(20, 6))
-    #         with open(file_path + '/history.npy', 'wb') as f:
-    #             np.save(f, np.array(history))
-    #     return history
-
-    def compare_with_simulator(
-        self,
-        simulator_input_path="dataset_test/mutation_rates.npy",
-        simulator_output_path="dataset_test/simulated_years_of_survival.npy",
-    ):
-        """Inputs in (n_samples, 4), outputs in (n_samples, 1)"""
-        inputs = np.load(simulator_input_path)
-        outputs = np.load(simulator_output_path)
-        initial_population = 500
-        model_input = np.hstack(
-            [
-                np.full((inputs.shape[0], 1), initial_population),
-                inputs,
-                np.ones((inputs.shape[0], 1)),
-            ]
-        )
-        print(model_input)
-        model_output = self.predict(model_input)
-        se = (model_output - outputs) ** 2
-
-        mse = np.mean(se)
-        return mse
-
-    @property
-    def X(self) -> np.ndarray:
-        return self.drift_emukit.X, self.pop_emukit.X
-
-    @property
-    def Y(self) -> np.ndarray:
-        return self.drift_emukit.Y, self.pop_emukit.Y
-
-    @property
-    def DriftModel(self) -> IModel:
-        return self.drift_emukit
-
-    @property
-    def PopulationModel(self) -> IModel:
-        return self.pop_emukit
-
-    def save_models(self, drift_file, population_file):
-        np.save(f"{drift_file}.npy", self.drift_emukit.gpy_model.param_array)
-        np.save(f"{population_file}.npy", self.pop_emukit.model.param_array)
-
-    def load_models(self, drift_file, population_file):
-        self.drift_emukit.gpy_model.update_model(False)
-        self.drift_emukit.gpy_model[:] = np.load(drift_file)
-        self.drift_emukit.gpy_model.update_model(True)
-
-        self.pop_emukit.model.update_model(False)
-        self.pop_emukit.model[:] = np.load(population_file)
-        self.pop_emukit.model.update_model(True)
