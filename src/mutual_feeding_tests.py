@@ -4,6 +4,7 @@ import os
 from emukit.core.initial_designs.latin_design import LatinDesign
 
 from coupledgp import (
+    coupled_space,
     generate_data,
     load_data_from_file,
     CoupledGPModel,
@@ -11,7 +12,7 @@ from coupledgp import (
 
 base_path = os.path.dirname(__file__)
 USE_DATA_PATH = True
-USE_MODEL_PATH = False
+USE_MODEL_PATH = True
 
 TEST_PREDICTION = True
 VISUALIZE_RESULTS = True
@@ -52,6 +53,11 @@ else:
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 
+design = LatinDesign(coupled_space)
+X = design.get_samples(5)
+print(model.predict(X, 5))
+
+quit()
 print(model.compare_with_simulator())
 
 print(

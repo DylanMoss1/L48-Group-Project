@@ -96,65 +96,56 @@ class CoupledGPModel(IModel):
         rng = np.random.default_rng(seed)
         # adds input indices at the beginning for distinguishing inputs
         X = np.insert(X, [0], np.arange(X.shape[0])[:, None], axis=1)
-        # store mutation rates for input conversions
-        mutation_rates = X[:, 2:]
 
         # initialize output arrays to 0 (final form is (n_inputs x n_samples) array)
         final_extinction_days = np.zeros((X.shape[0], n_samples))
 
-        ## prepare inputs for emulation
-        # repeat n_sample times to represent drawing from a trait uniform distribution n_sample times (different trait values)
-        X = np.tile(X, (n_samples, 1))
-        traits = rng.uniform(0, 1, (X.shape[0], NUM_TRAITS))
-        # add indices to identify emulation run
-        X = np.insert(
-            X, [1], np.arange(X.shape[0])[:, None] % n_samples, axis=1
-        )
-        # convert coupled inputs to population inputs
-        X = coupled_to_population(X, 1, traits)
-
-        # initialize execution loop
-        day = 1
-        is_all_extinct = False
         # start emulation
-        while not is_all_extinct:
-            # run emulation step for non-extinct inputs
-            X = self._run_emulation_step(
-                X, mutation_rates, day, n_samples, rng
+        for x_input in X:
+            print(f"Emulating input: {x_input}")
+            # store mutation rates for input conversions
+            mutation_rates = x_input[2:]
+            ## prepare input for emulator
+            # repeat n_sample times to represent drawing from a trait uniform distribution n_sample times (different trait values)
+            temp_x = np.tile(x_input, (n_samples, 1))
+            traits = rng.uniform(0, 1, (n_samples, NUM_TRAITS))
+            # convert coupled inputs to population inputs
+            temp_x = coupled_to_population(temp_x, 1, traits)
+            # add indices to identify emulation runs
+            temp_x = np.insert(
+                temp_x, [1], np.arange(temp_x.shape[0])[:, None], axis=1
             )
-
-            # wrap input variance samples to do checks (n_inputs x 12 x n_samples)
-            wrapped_inputs = np.dstack(np.vsplit(X, n_samples))
-            # get population values (tuple of (input_index, sample_index) pairs)
-            for row_index, depth_index in np.where(
-                wrapped_inputs[:, 3, :] <= 0
-            ):
-                input_index = wrapped_inputs[row_index, 0, depth_index]
-                sample_index = wrapped_inputs[row_index, 1, depth_index]
-                if (
-                    final_extinction_days[input_index, sample_index] == 0
-                ):  # i.e., new extinction
-                    final_extinction_days[input_index, sample_index] = day
-            # remove any fully extinct input rows
-            fully_extinct_rows = np.nonzero(
-                np.all(final_extinction_days, axis=1)
-            )[0]
-            for row_index in fully_extinct_rows:
-                wrapped_inputs = np.delete(
-                    wrapped_inputs,
-                    np.where(wrapped_inputs[:, 0, :] == row_index)[0],
-                    axis=0,
+            # initialize execution loop
+            day = 1
+            is_all_extinct = False
+            while not is_all_extinct:
+                # run emulation step for non-extinct inputs
+                temp_x = self._run_emulation_step(
+                    temp_x, mutation_rates, day, n_samples, rng
                 )
-            # unwrap samples
-            X = np.vstack(np.dsplit(wrapped_inputs, n_samples))
 
-            # book-keeping at the end
-            day += 1
-            is_all_extinct = np.all(final_extinction_days)
-            if max_iters is not None and day > max_iters:
-                final_extinction_days[final_extinction_days == 0] = max_iters
-                break
-
+                # do population checks (n_remaining_samples x 12)
+                dead_indices = np.where(temp_x[:, 3] <= 0)[0]
+                alive_indices = np.where(temp_x[:, 3] > 0)[0]
+                # get population values (sample_index)
+                for dead_index in dead_indices:
+                    input_index = int(temp_x[dead_index, 0])
+                    sample_index = int(temp_x[dead_index, 1])
+                    print(input_index, sample_index)
+                    if (
+                        final_extinction_days[input_index, sample_index] == 0
+                    ):  # i.e., new extinction
+                        final_extinction_days[input_index, sample_index] = day
+                # remove any fully extinct samples
+                temp_x = temp_x[alive_indices, :]
+                # book-keeping at the end
+                day += 1
+                is_all_extinct = len(temp_x) == 0
+                if max_iters is not None and day > max_iters:
+                    final_extinction_days[
+                        final_extinction_days == 0
+                    ] = max_iters
+                    break
         final_means = np.mean(final_extinction_days, axis=1)
         final_vars = np.var(final_extinction_days, axis=1)
         return final_means, final_vars
@@ -171,38 +162,35 @@ class CoupledGPModel(IModel):
 
         Args:
             pop_X (np.ndarray): input of the current emulation step (population emulator).
-                This is in the form ([n_inputs * n_samples] x [input_index, sample_index, temperature, population, size, speed, vision, aggression, size_var, speed_var, vision_var, aggression_var]).
+                This is in the form (n_samples x [input_index, sample_index, temperature, population, size, speed, vision, aggression, size_var, speed_var, vision_var, aggression_var]).
             mutation_rates (np.ndarray): mutation rate information for swapping to drift inputs
-                This is in the form (n_inputs x 4)
+                This is in the form (4)
 
         Returns:
             np.ndarray: next (population) input
         """
-        print(pop_X.shape)
         sampled_Y_mean, sampled_Y_var = self.pop_emukit.predict(
             pop_X[:, 2:]
         )  # remove index from input
-        Y_mean = np.mean(
-            np.hstack(np.split(sampled_Y_mean, n_samples, axis=0)), axis=0
-        )
-        Y_var = np.sum(
-            (np.hstack(np.split(sampled_Y_var, n_samples, axis=0)) / n_samples)
-            ** 2,
-            axis=0,
-        )
+        Y_mean = np.mean(sampled_Y_mean)
+        Y_var = np.sum((sampled_Y_var / len(sampled_Y_var)) ** 2)
 
         drift_X = population_to_drift(
             pop_X, Y_mean, Y_var, day, n_samples, rng, mutation_rates
         )
         sampled_Y_mean, sampled_Y_var = self.pop_emukit.predict(drift_X[:, 2:])
         Y_mean = np.mean(
-            np.hstack(np.split(sampled_Y_mean, n_samples, axis=0)), axis=0
-        )
+            np.hstack(np.vsplit(sampled_Y_mean, NUM_TRAITS)), axis=0
+        ).reshape((NUM_TRAITS, 1))
         Y_var = np.sum(
-            (np.hstack(np.split(sampled_Y_var, n_samples, axis=0)) / n_samples)
+            (
+                np.hstack(np.vsplit(sampled_Y_var, NUM_TRAITS))
+                / len(sampled_Y_var)
+                / NUM_TRAITS
+            )
             ** 2,
             axis=0,
-        )
+        ).reshape((NUM_TRAITS, 1))
 
         pop_X = drift_to_population(
             drift_X, Y_mean, Y_var, day, n_samples, rng
