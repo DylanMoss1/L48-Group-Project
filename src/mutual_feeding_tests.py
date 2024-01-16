@@ -46,13 +46,21 @@ if USE_MODEL_PATH:
 else:
     model.optimize()
     model.save_models(
-        "./src/coupledgp/tests/drift_model_8",
-        "./src/coupledgp/tests/population_model_8",
+        "./src/coupledgp/tests/drift_model_custom_kernel_2",
+        "./src/coupledgp/tests/population_model_custom_kernel_2",
     )
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 
 print(model.compare_with_simulator())
+
+print(
+    model.compare_with_simulator(
+        "./src/coupledgp/tests/mutation_rates.npy",
+        "./src/coupledgp/tests/simulated_years_of_survival.npy",
+    )
+)
+# quit()
 
 # predicting with coupled model
 if TEST_PREDICTION:
