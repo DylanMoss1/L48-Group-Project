@@ -9,11 +9,11 @@ from GPy.core.gp import GP
 def get_next_trait_kernel(X, trait_index_in_input):
     trait_kernel = Linear(1, active_dims=[trait_index_in_input])
     remaining_inputs_kernel = RBF(
-        X.shape[1] - 1,
+        X.shape[1] - 2,
         lengthscale=0.1,
         variance=1,
         active_dims=[
-            i for i in range(X.shape[1]) if i != trait_index_in_input
+            i for i in range(X.shape[1] - 1) if i != trait_index_in_input
         ],
     )
     next_trait_kernel = trait_kernel + remaining_inputs_kernel
@@ -48,22 +48,22 @@ class GeneticDriftModel(GP):
         # kernel_rbf_1 = GPy.kern.RBF(input_dim=1, lengthscale=0.1, variance=1, active_dims=[0])
         # remaining_inputs_kernel = RBF(X.shape[1], lengthscale=0.1, variance=1, active_dims=[i for i in range(len(X)) if i != 1])
 
-        # next_size_kernel = get_next_trait_kernel(X, 2)
-        # next_speed_kernel = get_next_trait_kernel(X, 3)
-        # next_vision_kernel = get_next_trait_kernel(X, 4)
-        # next_aggression_kernel = get_next_trait_kernel(X, 5)
+        next_size_kernel = get_next_trait_kernel(X, 2)
+        next_speed_kernel = get_next_trait_kernel(X, 3)
+        next_vision_kernel = get_next_trait_kernel(X, 4)
+        next_aggression_kernel = get_next_trait_kernel(X, 5)
 
         # -1 is because X has an addition column at the end to specify the output index to return, which doesn't matter for the kernel (not an official input)
         kernel = LCM(
-            X.shape[1] - 1,
+            X.shape[1] - 2,
             self.num_outputs,
             [
-                RBF(X.shape[1] - 1),
-                RBF(X.shape[1] - 1),
-                RBF(X.shape[1] - 1),
-                RBF(X.shape[1] - 1),
+                next_size_kernel,
+                next_speed_kernel,
+                next_vision_kernel,
+                next_aggression_kernel,
             ],
-            W_rank=self.num_outputs,
+            W_rank=4,
         )
         likelihood = build_likelihood(Y_list, self.output_index, None)
         super().__init__(

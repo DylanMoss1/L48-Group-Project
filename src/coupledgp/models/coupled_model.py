@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from datetime import datetime
-import os
 from typing import Dict, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,10 +12,24 @@ from emukit.sensitivity.monte_carlo import (
     MonteCarloSensitivity,
 )
 from emukit.core.interfaces import IModel
-from emukit.core.optimization import GradientAcquisitionOptimizer
+from emukit.bayesian_optimization.loops import (
+    BayesianOptimizationLoop,
+    BayesianOptimizationResults,
+)
+from emukit.bayesian_optimization.acquisitions import (
+    ExpectedImprovement,
+    ProbabilityOfImprovement,
+    NegativeLowerConfidenceBound,
+)
+from emukit.benchmarking.loop_benchmarking.benchmarker import Benchmarker
+from emukit.benchmarking.loop_benchmarking.metrics import (
+    MeanSquaredErrorMetric,
+)
+from emukit.benchmarking.loop_benchmarking.benchmark_plot import BenchmarkPlot
 from emukit.model_wrappers import GPyModelWrapper, GPyMultiOutputWrapper
 
 from ..utils import *
+from ..data import SimulateCoupled
 from ..models.genetic_drift import GeneticDriftModel
 from ..models.population import PopulationModel
 from constants import NUM_INITIAL_SPECIES_FRACTION
@@ -57,6 +70,8 @@ class CoupledGPModel(IModel):
     """
 
     def __init__(self, X, Y):
+        self.X = X
+        self.Y = Y
         x_drift, y_drift = format_data_for_drift_model(X, Y)
         x_pop, y_pop = format_data_for_population_model(X, Y)
         drift_gpy = GeneticDriftModel(x_drift, y_drift)
@@ -208,8 +223,91 @@ class CoupledGPModel(IModel):
         self.pop_emukit.set_data(x_pop, y_pop)
 
     def optimize(self, verbose: bool = False) -> None:
-        self.drift_emukit.optimize()
-        self.pop_emukit.optimize()
+        self.drift_emukit.optimize(verbose=verbose)
+        self.pop_emukit.optimize(verbose=verbose)
+
+    def get_bayes_opt_loop(self, acquisition, update_interval):
+        bo_loop = BayesianOptimizationLoop(
+            coupled_space, self, acquisition, update_interval, 1
+        )
+        return bo_loop
+
+    def train(
+        self,
+        acquisition,
+        n_iterations: int = 10,
+        update_interval: int = 5,
+    ):
+        bo_loop = self.get_bayes_opt_loop(acquisition, update_interval)
+        bo_loop.run_loop(SimulateCoupled(), n_iterations)
+        results = bo_loop.get_results()
+        self.plot_training(results)
+        return results
+
+    def train_comparison(
+        self,
+        n_iterations: int = 10,
+        n_initial_data: int = 1,
+        update_interval: int = 5,
+    ):
+        inputs = np.load("./src/dataset_test/mutation_rates.npy")
+        outputs = np.load("./src/dataset_test/simulated_years_of_survival.npy")
+        initial_population = 500
+        model_input = np.hstack(
+            [
+                np.full((inputs.shape[0], 1), initial_population),
+                inputs,
+                np.ones((inputs.shape[0], 1)),
+            ]
+        )
+        loops = [
+            (
+                "Expected Improvement",
+                lambda loop_state: self.get_bayes_opt_loop(
+                    ExpectedImprovement(
+                        CoupledGPModel(loop_state.X, loop_state.Y)
+                    ),
+                    update_interval,
+                ),
+            ),
+            (
+                "Probability of Improvement",
+                lambda loop_state: self.get_bayes_opt_loop(
+                    ProbabilityOfImprovement(
+                        CoupledGPModel(loop_state.X, loop_state.Y)
+                    ),
+                    update_interval,
+                ),
+            ),
+            (
+                "Negative LCB",
+                lambda loop_state: self.get_bayes_opt_loop(
+                    NegativeLowerConfidenceBound(
+                        CoupledGPModel(loop_state.X, loop_state.Y)
+                    ),
+                    update_interval,
+                ),
+            ),
+        ]
+        metrics = [MeanSquaredErrorMetric(model_input, outputs)]
+        benchmarker = Benchmarker(
+            loops, SimulateCoupled(), coupled_space, metrics=metrics
+        )
+        benchmark_results = benchmarker.run_benchmark(
+            n_iterations=n_iterations,
+            n_initial_data=n_initial_data,
+            n_repeats=10,
+        )
+        plots = BenchmarkPlot(
+            benchmark_results,
+            loop_colors=["m", "c", "g"],
+            loop_line_styles=["-", "--", "-."],
+            metrics_to_plot=["mean_squared_error"],
+        )
+        plots.make_plot()
+        plots.save_plot(
+            f"./src/coupledgp/tests/plots/acquisition_comparison_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
+        )
 
     def compare_with_simulator(
         self,
@@ -235,19 +333,11 @@ class CoupledGPModel(IModel):
 
     @property
     def X(self) -> np.ndarray:
-        return self.drift_emukit.X, self.pop_emukit.X
+        return self.X
 
     @property
     def Y(self) -> np.ndarray:
-        return self.drift_emukit.Y, self.pop_emukit.Y
-
-    @property
-    def DriftModel(self) -> IModel:
-        return self.drift_emukit
-
-    @property
-    def PopulationModel(self) -> IModel:
-        return self.pop_emukit
+        return self.Y
 
     def save_models(self, drift_file, population_file):
         np.save(f"{drift_file}.npy", self.drift_emukit.gpy_model.param_array)

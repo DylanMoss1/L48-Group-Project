@@ -1,10 +1,13 @@
 import numpy as np
+import random
+from typing import List
 
 from emukit.core.initial_designs.latin_design import LatinDesign
+from emukit.core.loop.user_function import UserFunction, UserFunctionResult
 
 from simulator import MainSimulator
 from world import DebugInfo
-from ..utils import logitems_to_vector, training_space
+from ..utils import logitems_to_vector, training_space, NUM_TRAITS
 
 
 def generate_data(n_samples: int, n_steps: int, save_location: str = None):
@@ -25,11 +28,11 @@ def generate_data(n_samples: int, n_steps: int, save_location: str = None):
     if save_location is None:
         save_location = ""
     np.save(
-        f"{save_location}x-sim-{n_samples}-{n_steps}",
+        f"{save_location}x-{n_samples}-simfor-{n_steps}-{NUM_TRAITS}-traits",
         X,
     )
     np.save(
-        f"{save_location}y-sim-{n_samples}-{n_steps}",
+        f"{save_location}y-{n_samples}-simfor-{n_steps}-{NUM_TRAITS}-traits",
         Y,
     )
 
@@ -77,3 +80,54 @@ def simulate(X, n_steps):
         all_results.append(sim_results)
     # results in the form [(days_survived, [LogItem]), ...] -> [LogItem, ...] -> [np.array (n_days, n_outputs), ...]
     return np.vstack(all_inputs), np.vstack(all_results)
+
+
+def simulate_coupled(X, n_steps):
+    simulator = MainSimulator()
+    all_inputs = []
+    all_results = []
+    for inputs in X:
+        sim_results = logitems_to_vector(
+            simulator.run_from_start_point(  # input in the form (day, population, m1, ..., m4, t1, ..., t4)
+                mutation_rates={
+                    "size": inputs[1],
+                    "speed": inputs[2],
+                    "vision": inputs[3],
+                    "aggression": inputs[4],
+                },
+                day_start_point=0,
+                population_start_point=inputs[0],
+                mutation_start_point={
+                    "size": (random.random(), 0),
+                    "speed": (random.random(), 0),
+                    "vision": (random.random(), 0),
+                    "aggression": (random.random(), 0),
+                },
+                max_days=n_steps,
+            )[
+                1
+            ]
+        )
+        sim_inputs = np.delete(sim_results, 2, 1)[
+            :-1, :
+        ]  # inputs are previous day's output for sim (minus temperature)
+        sim_inputs = np.insert(
+            sim_inputs,
+            [2],
+            [inputs[2], inputs[3], inputs[4], inputs[5]],
+            axis=1,
+        )
+        sim_inputs = np.vstack([inputs, sim_inputs])
+        all_inputs.append(sim_inputs)
+        all_results.append(sim_results)
+    # results in the form [(days_survived, [LogItem]), ...] -> [LogItem, ...] -> [np.array (n_days, n_outputs), ...]
+    return np.vstack(all_inputs), np.vstack(all_results)
+
+
+class SimulateCoupled(UserFunction):
+    def __init__(self, n_steps: int = None):
+        self.n_steps = n_steps
+
+    def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
+        new_inputs, outputs = simulate_coupled(X, self.n_steps)
+        return [UserFunctionResult(new_inputs, outputs)]

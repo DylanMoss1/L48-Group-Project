@@ -8,11 +8,12 @@ from coupledgp import (
     generate_data,
     load_data_from_file,
     CoupledGPModel,
+    NUM_TRAITS,
 )
 
 base_path = os.path.dirname(__file__)
-USE_DATA_PATH = True
-USE_MODEL_PATH = True
+USE_DATA_PATH = False
+USE_MODEL_PATH = False
 
 TEST_PREDICTION = True
 VISUALIZE_RESULTS = True
@@ -24,6 +25,25 @@ SHOW_GRAPHS = False
 start_time = time.time()
 eval_times = dict()
 
+# training data
+for n, n_s in zip([1, 2, 5, 10, 500], [500, 250, 100, 50, 1]):
+    print(f"Generating data for {n} runs of {n_s} steps:")
+    X, Y = generate_data(n, n_s, "./src/coupledgp/tests/")
+for n, n_s in zip([1, 2, 5, 10, 500], [500, 250, 100, 50, 1]):
+    print(f"Optimizing model for {n} runs of {n_s} steps:")
+    X, Y = load_data_from_file(
+        f"./src/coupledgp/tests/x-{n}-simfor-{n_s}-{NUM_TRAITS}-traits.npy",
+        f"./src/coupledgp/tests/y-{n}-simfor-{n_s}-{NUM_TRAITS}-traits.npy",
+    )
+    model = CoupledGPModel(X, Y)
+    model.optimize()
+    model.save_models(
+        f"./src/coupledgp/tests/drift_model_{n}_runs_{n_s}_steps",
+        f"./src/coupledgp/tests/population_model_{n}_runs_{n_s}_steps",
+    )
+
+quit()
+
 # generate training data
 if USE_DATA_PATH:
     X, Y = load_data_from_file(
@@ -32,8 +52,8 @@ if USE_DATA_PATH:
     )
 else:
     X, Y = generate_data(
-        10, 100, "./src/coupledgp/tests/"
-    )  # runs simulator for 100 days per sample (total 1000)
+        2, 100, "./src/coupledgp/tests/"
+    )  # runs simulator for 100 days per sample
 generate_finished = time.time()
 eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 
@@ -53,20 +73,13 @@ else:
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 
-design = LatinDesign(coupled_space)
-X = design.get_samples(5)
-print(model.predict(X, 5))
-
-quit()
-print(model.compare_with_simulator())
-
 print(
     model.compare_with_simulator(
         "./src/coupledgp/tests/mutation_rates.npy",
         "./src/coupledgp/tests/simulated_years_of_survival.npy",
     )
 )
-# quit()
+quit()
 
 # predicting with coupled model
 if TEST_PREDICTION:
