@@ -47,8 +47,8 @@ class Species:
         Stores the direction the species last moved in.
         The value 0 represents North, 1 represents East, 2 represents South, 3 represents West.
     """
-
-    def __init__(self, size=0.5, speed=0.5, vision=0.5, aggression=0.5, energy=initial_energy) -> None:
+    
+    def __init__(self, size=0.99, speed=0.99, vision=0.99, aggression=0.99, energy=initial_energy) -> None:
         """
         Initialise a Species object.
         """

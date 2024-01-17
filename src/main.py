@@ -10,9 +10,9 @@ if __name__ == "__main__":
 
     mutation_rates = {
         "size": 0.9,
-        "speed": 0.9,
-        "vision": 0.9,
-        "aggression": 0.9,
+        "speed": 0.1,
+        "vision": 0.1,
+        "aggression": 0.1,
     }
 
     # mutation_start_point = {
