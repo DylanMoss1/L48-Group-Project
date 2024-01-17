@@ -12,7 +12,7 @@ from coupledgp import (
 )
 
 base_path = os.path.dirname(__file__)
-USE_DATA_PATH = False
+USE_DATA_PATH = True
 USE_MODEL_PATH = False
 
 TEST_PREDICTION = True
@@ -26,29 +26,29 @@ start_time = time.time()
 eval_times = dict()
 
 # training data
-for n, n_s in zip([1, 2, 5, 10, 500], [500, 250, 100, 50, 1]):
-    print(f"Generating data for {n} runs of {n_s} steps:")
-    X, Y = generate_data(n, n_s, "./src/coupledgp/tests/")
-for n, n_s in zip([1, 2, 5, 10, 500], [500, 250, 100, 50, 1]):
-    print(f"Optimizing model for {n} runs of {n_s} steps:")
-    X, Y = load_data_from_file(
-        f"./src/coupledgp/tests/x-{n}-simfor-{n_s}-{NUM_TRAITS}-traits.npy",
-        f"./src/coupledgp/tests/y-{n}-simfor-{n_s}-{NUM_TRAITS}-traits.npy",
-    )
-    model = CoupledGPModel(X, Y)
-    model.optimize()
-    model.save_models(
-        f"./src/coupledgp/tests/drift_model_{n}_runs_{n_s}_steps",
-        f"./src/coupledgp/tests/population_model_{n}_runs_{n_s}_steps",
-    )
+# for n, n_s in zip([1, 2, 5, 10, 500], [500, 250, 100, 50, 1]):
+#     print(f"Generating data for {n} runs of {n_s} steps:")
+#     X, Y = generate_data(n, n_s, "./src/coupledgp/tests/")
+# for n, n_s in zip([1, 2, 5, 10, 500], [500, 250, 100, 50, 1]):
+#     print(f"Optimizing model for {n} runs of {n_s} steps:")
+#     X, Y = load_data_from_file(
+#         f"./src/coupledgp/tests/x-{n}-simfor-{n_s}-{NUM_TRAITS}-traits.npy",
+#         f"./src/coupledgp/tests/y-{n}-simfor-{n_s}-{NUM_TRAITS}-traits.npy",
+#     )
+#     model = CoupledGPModel(X, Y)
+#     model.optimize()
+#     model.save_models(
+#         f"./src/coupledgp/tests/drift_model_{n}_runs_{n_s}_steps",
+#         f"./src/coupledgp/tests/population_model_{n}_runs_{n_s}_steps",
+#     )
 
-quit()
+# quit()
 
 # generate training data
 if USE_DATA_PATH:
     X, Y = load_data_from_file(
-        "./src/coupledgp/tests/x-sim-2.npy",
-        "./src/coupledgp/tests/y-sim-2.npy",
+        "./src/coupledgp/tests/x-1-simfor-500-8-traits.npy",
+        "./src/coupledgp/tests/y-1-simfor-500-8-traits.npy",
     )
 else:
     X, Y = generate_data(
@@ -59,17 +59,17 @@ eval_times["generate"] = (USE_DATA_PATH, generate_finished - start_time)
 
 # training coupled model
 model = CoupledGPModel(X, Y)
-if USE_MODEL_PATH:
-    model.load_models(
-        "./src/coupledgp/tests/drift_model.npy",
-        "./src/coupledgp/tests/population_model.npy",
-    )
-else:
-    model.optimize()
-    model.save_models(
-        "./src/coupledgp/tests/drift_model_custom_kernel_2",
-        "./src/coupledgp/tests/population_model_custom_kernel_2",
-    )
+# if USE_MODEL_PATH:
+#     model.load_models(
+#         "./src/coupledgp/tests/drift_model.npy",
+#         "./src/coupledgp/tests/population_model.npy",
+#     )
+# else:
+#     model.optimize()
+#     model.save_models(
+#         "./src/coupledgp/tests/drift_model_custom_kernel_2",
+#         "./src/coupledgp/tests/population_model_custom_kernel_2",
+#     )
 model_finished = time.time()
 eval_times["training"] = (USE_MODEL_PATH, model_finished - generate_finished)
 

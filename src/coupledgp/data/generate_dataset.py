@@ -7,7 +7,6 @@ from emukit.core.loop.user_function import UserFunction, UserFunctionResult
 from GPy.util.multioutput import build_XY
 
 from simulator import MainSimulator
-from world import DebugInfo
 from ..utils import *
 
 
@@ -87,6 +86,7 @@ def simulate_coupled(X, n_steps):
     simulator = MainSimulator()
     all_inputs = []
     all_results = []
+    survival_days = []
     for inputs in X:
         sim_results = logitems_to_vector(
             simulator.run_from_start_point(  # input in the form (day, population, m1, ..., m4, t1, ..., t4)
@@ -109,6 +109,7 @@ def simulate_coupled(X, n_steps):
                 1
             ]
         )
+        survival_days.append(sim_results[-1, 0])
         sim_inputs = np.delete(sim_results, 2, 1)[
             :-1, :
         ]  # inputs are previous day's output for sim (minus temperature)
@@ -122,7 +123,7 @@ def simulate_coupled(X, n_steps):
         all_inputs.append(sim_inputs)
         all_results.append(sim_results)
     # results in the form [(days_survived, [LogItem]), ...] -> [LogItem, ...] -> [np.array (n_days, n_outputs), ...]
-    return np.vstack(all_inputs), np.vstack(all_results)
+    return np.vstack(all_inputs), np.vstack(all_results), survival_days
 
 
 def simulate_drift(X, n_steps):
@@ -135,20 +136,27 @@ def simulate_drift(X, n_steps):
 
 def simulate_population(X, n_steps):
     X[:, 0] = temperature_to_day(X[:, 0])
-    X = np.hstack(
-        [X, np.zeros(X.shape[0], 4)]
-    )
+    X = np.hstack([X, np.zeros(X.shape[0], 4)])
     new_inputs, outputs = simulate(X, n_steps)
     x_pop, y_pop = format_data_for_population_model(new_inputs, outputs)
     return x_pop, y_pop
+
 
 class SimulateCoupled(UserFunction):
     def __init__(self, n_steps: int = None):
         self.n_steps = n_steps
 
-    def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
-        new_inputs, outputs = simulate_coupled(X, self.n_steps)
-        return [UserFunctionResult(new_inputs, outputs)]
+    def evaluate(self, X: np.array) -> List[UserFunctionResult]:
+        old_input = X
+        new_inputs, outputs, survival_days = simulate_coupled(X, self.n_steps)
+        return [
+            CustomUserFunctionResult(
+                old_input,
+                survival_days,
+                data_input=new_inputs,
+                data_output=outputs,
+            )
+        ]
 
 
 class SimulateDrift(UserFunction):
@@ -157,12 +165,19 @@ class SimulateDrift(UserFunction):
 
     def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
         new_inputs, outputs = simulate_drift(X, self.n_steps)
-        return [UserFunctionResult(new_inputs, outputs)]
+        return [
+            UserFunctionResult(new_inputs[i], outputs[i])
+            for i in range(new_inputs.shape[0])
+        ]
+
 
 class SimulatePopulation(UserFunction):
     def __init__(self, n_steps: int = 1):
         self.n_steps = n_steps
-        
+
     def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
         new_inputs, outputs = simulate_population(X, self.n_steps)
-        return [UserFunctionResult(new_inputs, outputs)]
+        return [
+            UserFunctionResult(new_inputs[i], outputs[i])
+            for i in range(new_inputs.shape[0])
+        ]

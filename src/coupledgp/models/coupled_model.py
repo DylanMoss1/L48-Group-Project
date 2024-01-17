@@ -12,9 +12,10 @@ from emukit.sensitivity.monte_carlo import (
     MonteCarloSensitivity,
 )
 from emukit.core.interfaces import IModel
-from emukit.bayesian_optimization.loops import (
-    BayesianOptimizationLoop,
-)
+from emukit.core.loop import SequentialPointCalculator, OuterLoop
+from emukit.core.loop.loop_state import LoopState
+from emukit.core.optimization import GradientAcquisitionOptimizer
+from emukit.bayesian_optimization.loops import BayesianOptimizationLoop
 from emukit.bayesian_optimization.acquisitions import (
     ExpectedImprovement,
     ProbabilityOfImprovement,
@@ -69,8 +70,8 @@ class CoupledGPModel(IModel):
     """
 
     def __init__(self, X, Y):
-        self.X = X
-        self.Y = Y
+        self.coupled_x = X
+        self.coupled_x = Y
         x_drift, y_drift = format_data_for_drift_model(X, Y)
         x_pop, y_pop = format_data_for_population_model(X, Y)
         drift_gpy = GeneticDriftModel(x_drift, y_drift)
@@ -106,6 +107,14 @@ class CoupledGPModel(IModel):
         Returns:
             Tuple[np.ndarray, np.ndarray]: the mean and variance for the number of days until extinction for each input
         """
+        # turns input into 2D np.ndarray if vector
+        if X.ndim != 2:
+            print(
+                "Input array is of dimension "
+                + X.ndim
+                + " when it should be 2. Attempting to correct."
+            )
+            X = X.reshape((1, X.shape[0]))
         # initializes random generator
         rng = np.random.default_rng(seed)
         # adds input indices at the beginning for distinguishing inputs
@@ -145,7 +154,6 @@ class CoupledGPModel(IModel):
                 for dead_index in dead_indices:
                     input_index = int(temp_x[dead_index, 0])
                     sample_index = int(temp_x[dead_index, 1])
-                    print(input_index, sample_index)
                     if (
                         final_extinction_days[input_index, sample_index] == 0
                     ):  # i.e., new extinction
@@ -162,6 +170,7 @@ class CoupledGPModel(IModel):
                     break
         final_means = np.mean(final_extinction_days, axis=1)
         final_vars = np.var(final_extinction_days, axis=1)
+        print(final_means.shape, final_vars.shape)
         return final_means, final_vars
 
     def _run_emulation_step(
@@ -209,8 +218,8 @@ class CoupledGPModel(IModel):
         return pop_X
 
     def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
-        self.X = X
-        self.Y = Y
+        self.coupled_x = X
+        self.coupled_y = Y
         x_list, y_list = format_data_for_drift_model(X, Y)
         x_drift, y_drift, _ = build_XY(x_list, y_list)
         x_pop, y_pop = format_data_for_population_model(X, Y)
@@ -218,15 +227,22 @@ class CoupledGPModel(IModel):
         self.drift_emukit.set_data(x_drift, y_drift)
         self.pop_emukit.set_data(x_pop, y_pop)
 
+    def set_results(self, X: np.ndarray, Y: np.ndarray) -> None:
+        self.results_x = X
+        self.results_y = Y
+
     def optimize(self, verbose: bool = False) -> None:
         self.drift_emukit.optimize(verbose=verbose)
         self.pop_emukit.optimize(verbose=verbose)
 
     def get_bayes_opt_loop(self, acquisition, update_interval):
-        bo_loop = BayesianOptimizationLoop(
-            coupled_space, self, acquisition, update_interval, 1
+        model_updater = CustomIntervalUpdater(self, update_interval)
+        acquisition_optimizer = GradientAcquisitionOptimizer(coupled_space)
+        candidate_point_calculator = SequentialPointCalculator(
+            acquisition, acquisition_optimizer
         )
-        return bo_loop
+        loop_state = None
+        return OuterLoop(candidate_point_calculator, model_updater, loop_state)
 
     def get_drift_bayes_opt_loop(self, acquisition, update_interval):
         bo_loop = BayesianOptimizationLoop(
@@ -450,11 +466,18 @@ class CoupledGPModel(IModel):
 
     @property
     def X(self) -> np.ndarray:
-        return self.X
+        return self.results_x
 
     @property
     def Y(self) -> np.ndarray:
-        return self.Y
+        return self.results_y
+
+    @property
+    def data_X(self) -> np.ndarray:
+        return self.coupled_x
+
+    def data_Y(self) -> np.ndarray:
+        return self.coupled_y
 
     def save_models(self, drift_file, population_file):
         np.save(f"{drift_file}.npy", self.drift_emukit.gpy_model.param_array)
