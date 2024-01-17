@@ -3,7 +3,6 @@ from typing import Dict, Any, List
 from species import Species
 from food import Food
 import math
-from pprint import pprint
 from tabulate import tabulate
 from termcolor import colored
 import constants
@@ -375,11 +374,14 @@ class World:
         self.species_age()
         num_species_alive = self.species_die()
 
+<<<<<<< HEAD
         # Clean all leftover food
         for row in self.grid:
             for location in row:
                 location.food_list = []
 
+=======
+>>>>>>> origin/modified_temperature
         log_item = LogItem(self.day, num_species_alive,
                            temperature, probability_of_food, traits_dict)
 
@@ -485,7 +487,11 @@ class World:
             Temperature on the current day
         """
 
+<<<<<<< HEAD
         return 10 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 100)
+=======
+        return 23.5 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 500)
+>>>>>>> origin/modified_temperature
 
     def add_food_to_grid(self) -> None:
         """
@@ -511,15 +517,23 @@ class World:
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
+<<<<<<< HEAD
         # print(temperature,probability_of_food)
 
         sum = 0
+=======
+        #print(probability_of_food)
+
+>>>>>>> origin/modified_temperature
         for row in self.grid:
             for location in row:
                 if random.random() < probability_of_food:
                     location.add_food()
+<<<<<<< HEAD
                 sum += len(location.food_list)
         # print("Total food:", sum)
+=======
+>>>>>>> origin/modified_temperature
 
         return temperature, probability_of_food
 
@@ -773,20 +787,34 @@ class World:
 
         for row in self.grid:
             for location in row:
+<<<<<<< HEAD
                 active_list = [species for species in location.species_list if not species.hibernate]
                 # print(location.species_list, active_list)
                 if len(active_list) > 0 and len(location.food_list) > 0:
                     if len(active_list) == 1:
                         for species in active_list:
+=======
+                if len(location.species_list) > 0 and len(location.food_list) > 0:
+                    if len(location.species_list) == 1:
+                        for species in location.species_list:
+>>>>>>> origin/modified_temperature
                             species.energy += len(location.food_list) * \
                                 food_value
                     else:
                         aggression = [
+<<<<<<< HEAD
                             species.aggression for species in active_list]
                         if all(aggr <= 0.5 for aggr in aggression):
                             for species in active_list:
                                 species.energy += len(active_list) * food_value / \
                                     len(active_list)
+=======
+                            species.aggression for species in location.species_list]
+                        if all(aggr <= 0.5 for aggr in aggression):
+                            for species in location.species_list:
+                                species.energy += len(location.food_list) * food_value / \
+                                    len(location.species_list)
+>>>>>>> origin/modified_temperature
                         else:
                             winner_hawk_indices = [
                                 i for i, j in enumerate(aggression)if j == max(aggression)]
@@ -799,7 +827,11 @@ class World:
                                 max_damage = max(aggression)
                             winner_hawk = active_list[random.sample(
                                 winner_hawk_indices, 1)[0]].id
+<<<<<<< HEAD
                             for species in active_list:
+=======
+                            for species in location.species_list:
+>>>>>>> origin/modified_temperature
                                 if species.aggression > 0.5:
                                     if species.id == winner_hawk:
                                         species.energy += len(
@@ -835,10 +867,17 @@ class World:
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
+<<<<<<< HEAD
                     energy_loss = ((0.25 + species.speed)**2) * energy_loss_base
                     energy_loss += ((species.vision) * energy_loss_base) / 2
                     species.energy -= energy_loss
                     maximum_stored_energy = species.size * food_value * 10
+=======
+                    energy_loss = ((1 + species.speed)**2) * energy_loss_base
+                    energy_loss += ((species.vision) * energy_loss_base) / 2
+                    species.energy -= energy_loss
+                    maximum_stored_energy = reproduction_threshold + species.size * food_value * 10
+>>>>>>> origin/modified_temperature
                     species.energy = min(species.energy, maximum_stored_energy)
     
     def species_age(self) -> None:
@@ -851,7 +890,16 @@ class World:
                 for species in location.species_list:
                     species.age += 1
 
-    
+    def species_age(self) -> None:
+        """
+        all creatures get older
+        """
+
+        for row in self.grid:
+            for location in row:
+                for species in location.species_list:
+                    species.age += 1
+
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)

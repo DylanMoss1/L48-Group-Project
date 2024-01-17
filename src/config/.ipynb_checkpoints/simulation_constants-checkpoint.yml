@@ -7,8 +7,13 @@ NUM_INITIAL_SPECIES_FRACTION: 1
 NUM_ACTIONS_PER_DAY: 5
 
 # Controls the probability of food being generated at a given location 
+<<<<<<< HEAD
 FOOD_PROBABILITY_SCALAR: 1
 FOOD_PROBABILITY_STD: 5
+=======
+FOOD_PROBABILITY_SCALAR: 0.5
+FOOD_PROBABILITY_STD: 8
+>>>>>>> origin/modified_temperature
 
 # The temperature in which the most food is produced 
 OPTIMAL_TEMPERATURE: 10
@@ -23,10 +28,17 @@ INITIAL_ENERGY: 10
 ENERGY_LOSS: 15
 
 # Initial trait values 
+<<<<<<< HEAD
 INITIAL_SIZE: 0.5
 INITIAL_SPEED: 0.5
 INITIAL_VISION: 0.5
 INITIAL_AGGRESSION: 0.5
+=======
+# INITIAL_SIZE: 0.5
+# INITIAL_SPEED: 0.5
+# INITIAL_VISION: 0.5
+# INITIAL_AGGRESSION: 0.5
+>>>>>>> origin/modified_temperature
 
 # The amount of energy gained by eating each piece of food (@Atreyi to check)
 FOOD_VALUE: 15
