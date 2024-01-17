@@ -14,7 +14,6 @@ from emukit.sensitivity.monte_carlo import (
 from emukit.core.interfaces import IModel
 from emukit.bayesian_optimization.loops import (
     BayesianOptimizationLoop,
-    BayesianOptimizationResults,
 )
 from emukit.bayesian_optimization.acquisitions import (
     ExpectedImprovement,
@@ -29,7 +28,7 @@ from emukit.benchmarking.loop_benchmarking.benchmark_plot import BenchmarkPlot
 from emukit.model_wrappers import GPyModelWrapper, GPyMultiOutputWrapper
 
 from ..utils import *
-from ..data import SimulateCoupled
+from ..data import SimulateCoupled, SimulateDrift, SimulatePopulation
 from ..models.genetic_drift import GeneticDriftModel
 from ..models.population import PopulationModel
 from constants import NUM_INITIAL_SPECIES_FRACTION
@@ -136,7 +135,7 @@ class CoupledGPModel(IModel):
             while not is_all_extinct:
                 # run emulation step for non-extinct inputs
                 temp_x = self._run_emulation_step(
-                    temp_x, mutation_rates, day, n_samples, rng
+                    temp_x, mutation_rates, day, rng
                 )
 
                 # do population checks (n_remaining_samples x 12)
@@ -170,7 +169,6 @@ class CoupledGPModel(IModel):
         pop_X: np.ndarray,
         mutation_rates: np.ndarray,
         day: int,
-        n_samples: int,
         rng: np.random.Generator,
     ) -> Tuple[np.ndarray, np.ndarray, str]:
         """Runs a single day of emulation (population -> drift ->)
@@ -191,7 +189,7 @@ class CoupledGPModel(IModel):
         Y_var = np.sum((sampled_Y_var / len(sampled_Y_var)) ** 2)
 
         drift_X = population_to_drift(
-            pop_X, Y_mean, Y_var, day, n_samples, rng, mutation_rates
+            pop_X, Y_mean, Y_var, day, rng, mutation_rates
         )
         sampled_Y_mean, sampled_Y_var = self.pop_emukit.predict(drift_X[:, 2:])
         Y_mean = np.mean(
@@ -207,9 +205,7 @@ class CoupledGPModel(IModel):
             axis=0,
         ).reshape((NUM_TRAITS, 1))
 
-        pop_X = drift_to_population(
-            drift_X, Y_mean, Y_var, day, n_samples, rng
-        )
+        pop_X = drift_to_population(drift_X, Y_mean, Y_var, day, rng)
         return pop_X
 
     def set_data(self, X: np.ndarray, Y: np.ndarray) -> None:
@@ -232,17 +228,45 @@ class CoupledGPModel(IModel):
         )
         return bo_loop
 
+    def get_drift_bayes_opt_loop(self, acquisition, update_interval):
+        bo_loop = BayesianOptimizationLoop(
+            drift_space, self.drift_emukit, acquisition, update_interval, 1
+        )
+        return bo_loop
+
+    def get_population_bayes_opt_loop(self, acquisition, update_interval):
+        bo_loop = BayesianOptimizationLoop(
+            population_space, self.pop_emukit, acquisition, update_interval, 1
+        )
+        return bo_loop
+
     def train(
         self,
         acquisition,
         n_iterations: int = 10,
         update_interval: int = 5,
+        train_components: bool = False,
     ):
-        bo_loop = self.get_bayes_opt_loop(acquisition, update_interval)
-        bo_loop.run_loop(SimulateCoupled(), n_iterations)
-        results = bo_loop.get_results()
-        self.plot_training(results)
-        return results
+        if train_components:
+            drift_bo_loop = self.get_drift_bayes_opt_loop(
+                acquisition, update_interval
+            )
+            pop_bo_loop = self.get_population_bayes_opt_loop(
+                acquisition, update_interval
+            )
+            drift_bo_loop.run_loop(SimulateDrift(), n_iterations)
+            pop_bo_loop.run_loop(SimulatePopulation(), n_iterations)
+            drift_results = drift_bo_loop.loop_state
+            pop_results = pop_bo_loop.loop_state
+            self.plot_training(drift_results)
+            self.plot_training(pop_results)
+            return drift_results, pop_results
+        else:
+            bo_loop = self.get_bayes_opt_loop(acquisition, update_interval)
+            bo_loop.run_loop(SimulateCoupled(), n_iterations)
+            results = bo_loop.loop_state
+            self.plot_training(results)
+            return results
 
     def train_comparison(
         self,
@@ -307,6 +331,99 @@ class CoupledGPModel(IModel):
         plots.make_plot()
         plots.save_plot(
             f"./src/coupledgp/tests/plots/acquisition_comparison_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
+        )
+
+    def plot_training(self, loop_state, plot_type: str):
+        mr_range = np.linspace(0, MAX_MUTATION_RATE, 100)
+        trait_range = np.linspace(0, MAX_TRAIT_VALUE, 100)
+        fig, axes = plt.subplots(4, 1, figsize=(20, 20))
+        if plot_type == "coupled":
+            for i in range(4):
+                X = np.hstack(
+                    [
+                        np.full((len(mr_range), 1), 500),
+                        np.zeros((len(mr_range), 4)),
+                    ]
+                )
+                X[:, 1 + i] = mr_range
+                mean, var = self.predict(X)
+                axes[i].plot(mr_range, mean)
+                axes[i].fill_between(
+                    mr_range,
+                    mean + np.sqrt(var),
+                    mean - np.sqrt(var),
+                    alpha=0.6,
+                )
+                axes[i].fill_between(
+                    mr_range,
+                    mean + 2 * np.sqrt(var),
+                    mean - 2 * np.sqrt(var),
+                    alpha=0.3,
+                )
+                axes[i].set(
+                    xlabel="mr", ylabel="days", title=f"{self.trait_names[i]}"
+                )
+        elif plot_type == "drift":
+            for i in range(4):
+                X = np.hstack(
+                    [
+                        np.full((len(trait_range), 1), 10),
+                        np.full((len(mr_range), 1), 500),
+                        np.full((len(mr_range), NUM_TRAITS), 0.5),
+                        np.zeros((len(mr_range), 4)),
+                        np.full((len(mr_range), 1), i),
+                    ]
+                )
+                X[:, 10 + i] = mr_range
+                mean, var = self.drift_emukit.predict(X)
+                axes[i].plot(mr_range, mean)
+                axes[i].fill_between(
+                    mr_range,
+                    mean + np.sqrt(var),
+                    mean - np.sqrt(var),
+                    alpha=0.6,
+                )
+                axes[i].fill_between(
+                    mr_range,
+                    mean + 2 * np.sqrt(var),
+                    mean - 2 * np.sqrt(var),
+                    alpha=0.3,
+                )
+                axes[i].set(
+                    xlabel="mr", ylabel="trait", title=f"{self.trait_names[i]}"
+                )
+        elif plot_type == "population":
+            for i in range(4):
+                X = np.hstack(
+                    [
+                        np.full((len(trait_range), 1), 10),
+                        np.full((len(mr_range), 1), 500),
+                        np.full((len(mr_range), NUM_TRAITS), 0.5),
+                    ]
+                )
+                X[:, 2 + i] = trait_range
+                mean, var = self.pop_emukit.predict(X)
+                axes[i].plot(trait_range, mean)
+                axes[i].fill_between(
+                    trait_range,
+                    mean + np.sqrt(var),
+                    mean - np.sqrt(var),
+                    alpha=0.6,
+                )
+                axes[i].fill_between(
+                    trait_range,
+                    mean + 2 * np.sqrt(var),
+                    mean - 2 * np.sqrt(var),
+                    alpha=0.3,
+                )
+                axes[i].set(
+                    xlabel="trait",
+                    ylabel="population",
+                    title=f"{self.trait_names[i]}",
+                )
+        plt.plot()
+        fig.savefig(
+            f"./src/coupledgp/tests/plots/{plot_type}_training_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
         )
 
     def compare_with_simulator(

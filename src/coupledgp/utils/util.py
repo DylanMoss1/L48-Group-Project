@@ -10,6 +10,15 @@ def day_to_temperature(day: np.array):
     return 10 + 18 * np.sin(2 * np.pi * day / 100) + (day / 100)
 
 
+def temperature_to_day(temperature: np.array):
+    possible_days = np.arange(1, 1000)
+    possible_temps = day_to_temperature(possible_days)
+    min_indices = abs(temperature[None, :] - possible_temps[:, None]).argmin(
+        axis=0
+    )
+    return possible_days[min_indices]
+
+
 def logitems_to_vector(items: List[LogItem]):
     result = np.vstack(
         [

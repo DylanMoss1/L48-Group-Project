@@ -7,4 +7,6 @@ from .parameters import (
     drift_space,
     population_space,
     training_space,
+    MAX_TRAIT_VALUE,
+    MAX_MUTATION_RATE,
 )

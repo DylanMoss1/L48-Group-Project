@@ -4,10 +4,11 @@ from typing import List
 
 from emukit.core.initial_designs.latin_design import LatinDesign
 from emukit.core.loop.user_function import UserFunction, UserFunctionResult
+from GPy.util.multioutput import build_XY
 
 from simulator import MainSimulator
 from world import DebugInfo
-from ..utils import logitems_to_vector, training_space, NUM_TRAITS
+from ..utils import *
 
 
 def generate_data(n_samples: int, n_steps: int, save_location: str = None):
@@ -124,10 +125,44 @@ def simulate_coupled(X, n_steps):
     return np.vstack(all_inputs), np.vstack(all_results)
 
 
+def simulate_drift(X, n_steps):
+    X[:, 0] = temperature_to_day(X[:, 0])
+    new_inputs, outputs = simulate(X[:, -1], n_steps)
+    x_list, y_list = format_data_for_drift_model(new_inputs, outputs)
+    x_drift, y_drift, _ = build_XY(x_list, y_list)
+    return x_drift, y_drift
+
+
+def simulate_population(X, n_steps):
+    X[:, 0] = temperature_to_day(X[:, 0])
+    X = np.hstack(
+        [X, np.zeros(X.shape[0], 4)]
+    )
+    new_inputs, outputs = simulate(X, n_steps)
+    x_pop, y_pop = format_data_for_population_model(new_inputs, outputs)
+    return x_pop, y_pop
+
 class SimulateCoupled(UserFunction):
     def __init__(self, n_steps: int = None):
         self.n_steps = n_steps
 
     def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
         new_inputs, outputs = simulate_coupled(X, self.n_steps)
+        return [UserFunctionResult(new_inputs, outputs)]
+
+
+class SimulateDrift(UserFunction):
+    def __init__(self, n_steps: int = 1):
+        self.n_steps = n_steps
+
+    def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
+        new_inputs, outputs = simulate_drift(X, self.n_steps)
+        return [UserFunctionResult(new_inputs, outputs)]
+
+class SimulatePopulation(UserFunction):
+    def __init__(self, n_steps: int = 1):
+        self.n_steps = n_steps
+        
+    def evaluate(self, X: np.ndarray) -> List[UserFunctionResult]:
+        new_inputs, outputs = simulate_population(X, self.n_steps)
         return [UserFunctionResult(new_inputs, outputs)]

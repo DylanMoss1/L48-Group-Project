@@ -22,7 +22,6 @@ def population_to_drift(
     prev_y_mean: np.ndarray,
     prev_y_var: np.ndarray,
     day: int,
-    n_samples: int,
     rng: np.random.Generator,
     mutation_rates: np.ndarray,
 ):
@@ -68,7 +67,6 @@ def drift_to_population(
     prev_y_mean: np.ndarray,
     prev_y_var: np.ndarray,
     day: int,
-    n_samples: int,
     rng: np.random.Generator,
 ):
     """
