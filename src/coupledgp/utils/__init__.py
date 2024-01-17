@@ -7,4 +7,5 @@ from .parameters import (
     drift_space,
     population_space,
     training_space,
+    test_space,
 )

@@ -4,7 +4,34 @@ from emukit.core.initial_designs.latin_design import LatinDesign
 
 from simulator import MainSimulator
 from world import DebugInfo
-from ..utils import logitems_to_vector, training_space
+from ..utils import logitems_to_vector, training_space, test_space
+
+
+def generate_test_data(n_samples, save_location: str = None):
+    simulator = MainSimulator()
+    design = LatinDesign(test_space)
+    X = design.get_samples(n_samples)
+    Y = []
+    for inputs in X:
+        days_survived = simulator.run(
+            mutation_rates={
+                "size": inputs[0],
+                "speed": inputs[1],
+                "vision": inputs[2],
+                "aggression": inputs[3],
+            }
+        )
+        Y.append(days_survived)
+    if save_location is None:
+        save_location = ""
+    np.save(
+        f"{save_location}x-sim-{n_samples}-test",
+        X,
+    )
+    np.save(
+        f"{save_location}y-sim-{n_samples}-test",
+        np.array(Y).reshape(len(Y), 1),
+    )
 
 
 def generate_data(n_samples: int, n_steps: int, save_location: str = None):

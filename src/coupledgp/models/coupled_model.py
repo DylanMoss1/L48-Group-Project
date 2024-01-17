@@ -202,6 +202,92 @@ class CoupledGPModel(IModel):
             )
             return formatted_population, next_input, next_mr, emulator_name
 
+    def plot_training(self, loop_state, plot_type: str):
+        mr_range = np.linspace(0, 1, 100)
+        trait_range = np.linspace(0, 1, 100)
+        fig, axes = plt.subplots(4, 1, figsize=(20, 20))
+        if plot_type == "coupled":
+            for i in range(4):
+                X = np.hstack(
+                    [
+                        np.full((len(mr_range), 1), 500),
+                        np.zeros((len(mr_range), 4)),
+                        np.ones((len(mr_range), 1))
+                    ]
+                )
+                X[:, 1 + i] = mr_range
+                mean = self.predict(X)
+                axes[i].plot(mr_range, mean.flatten())
+                axes[i].set(
+                    xlabel="mr", ylabel="days", title=f"{self.trait_names[i]}"
+                )
+        elif plot_type == "drift":
+            for i in range(4):
+                X = np.hstack(
+                    [
+                        np.full((len(trait_range), 1), 10),
+                        np.full((len(mr_range), 1), 500),
+                        np.full((len(mr_range), NUM_TRAITS), 0.5),
+                        np.zeros((len(mr_range), 4)),
+                        np.full((len(mr_range), 1), i),
+                    ]
+                )
+                X[:, 10 + i] = mr_range
+                mean, var = self.drift_emukit.predict(X)
+                mean = mean.flatten()
+                var = var.flatten()
+                axes[i].plot(mr_range, mean)
+                axes[i].fill_between(
+                    mr_range,
+                    mean + np.sqrt(var),
+                    mean - np.sqrt(var),
+                    alpha=0.6,
+                )
+                axes[i].fill_between(
+                    mr_range,
+                    mean + 2 * np.sqrt(var),
+                    mean - 2 * np.sqrt(var),
+                    alpha=0.3,
+                )
+                axes[i].set(
+                    xlabel="mr", ylabel="trait", title=f"{self.trait_names[i]}"
+                )
+        elif plot_type == "population":
+            for i in range(4):
+                X = np.hstack(
+                    [
+                        np.full((len(trait_range), 1), 10),
+                        np.full((len(mr_range), 1), 500),
+                        np.full((len(mr_range), NUM_TRAITS), 0.5),
+                    ]
+                )
+                X[:, 2 + i] = trait_range
+                mean, var = self.pop_emukit.predict(X)
+                mean = mean.flatten()
+                var = var.flatten()
+                axes[i].plot(trait_range, mean)
+                axes[i].fill_between(
+                    trait_range,
+                    mean + np.sqrt(var),
+                    mean - np.sqrt(var),
+                    alpha=0.6,
+                )
+                axes[i].fill_between(
+                    trait_range,
+                    mean + 2 * np.sqrt(var),
+                    mean - 2 * np.sqrt(var),
+                    alpha=0.3,
+                )
+                axes[i].set(
+                    xlabel="trait",
+                    ylabel="population",
+                    title=f"{self.trait_names[i]}",
+                )
+        plt.plot()
+        fig.savefig(
+            f"./src/coupledgp/tests/plots/{plot_type}_training_{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}.png"
+        )
+
     def plot_drift_model(self, show_plot: bool = True, save_plot: bool = True):
         """
         Plots drift model fit for trait value vs. trait mutation rate for each trait across several temperatures (-5, 10 [optimal], 25), keeping all initial traits (0.5), all other mutation rates (0.1), and population (500) constant.
@@ -411,38 +497,13 @@ class CoupledGPModel(IModel):
         self.pop_emukit.set_data(x_pop, y_pop)
 
     def optimize(self, verbose: bool = False) -> None:
+        self.drift_emukit.gpy_model.kern.fix()
+        self.pop_emukit.model.kern.fix()
         self.drift_emukit.optimize()
         self.pop_emukit.optimize()
+        self.drift_emukit.gpy_model.kern.constrain_positive()
+        self.pop_emukit.model.kern.constrain_positive()
 
-    # def optimize_acquisition(self, drift_acquisition, pop_acquisition, iterations = 1000):
-    #     file_path = 'coupledgp/training_logs/plot_mse_' + str(datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-    #     os.makedirs(file_path)
-    #     x_plot = np.arange(0, iterations)
-    #     history = []
-
-    #     for i in tqdm(range(iterations)):
-    #         mse = self.compare_with_simulator()
-    #         history.append(mse)
-
-    #         drift_optimizer = GradientAcquisitionOptimizer(self.drift_space)
-    #         pop_optimizer = GradientAcquisitionOptimizer(self.pop_space)
-    #         x_drift_new, _ = drift_optimizer.optimize(drift_acquisition)
-    #         x_pop_new, _ = pop_optimizer.optimize(pop_acquisition)
-
-    #         print("Next positions to query:", x_drift_new, x_pop_new)
-    #         drift_acquisition.debug(np.array(x_drift_new))
-    #         pop_acquisition.debug(np.array(x_pop_new))
-    #         y_new = target_function_list(x_new)
-    #         X = np.append(X, x_new, axis=0)
-    #         Y = np.append(Y, y_new, axis=0)
-    #         print(x_new, y_new)
-    #         model_emukit.set_data(X, Y)
-    #         plt.savefig(file_path + '/' + str(i) +'.png')
-    #         plt.clf()
-    #         figure, axis = plt.subplots(1, 2, figsize=(20, 6))
-    #         with open(file_path + '/history.npy', 'wb') as f:
-    #             np.save(f, np.array(history))
-    #     return history
 
     def compare_with_simulator(
         self,

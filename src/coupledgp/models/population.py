@@ -21,12 +21,15 @@ class PopulationModel(GP):
     """
 
     def __init__(self, X: np.array, Y: np.array):
-                
-        current_population_kernel = Linear(X.shape[1], active_dims=[1])
-        remaining_inputs_kernel = RBF(X.shape[1], lengthscale=0.1, variance=1, active_dims=[i for i in range(len(X)) if i != 1])
+        current_population_kernel = Linear(1, active_dims=[1])
+        remaining_inputs_kernel = RBF(
+            X.shape[1] - 1,
+            lengthscale=0.1,
+            variance=1,
+            active_dims=[i for i in range(X.shape[1]) if i != 1],
+        )
 
         kernel = current_population_kernel + remaining_inputs_kernel
-
         likelihood = Gaussian(variance=1.0)
 
         super().__init__(X, Y, kernel, likelihood, name="Population Model")
