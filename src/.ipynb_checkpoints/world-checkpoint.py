@@ -479,7 +479,7 @@ class World:
             Temperature on the current day
         """
 
-        return 10 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 100)
+        return 23.5 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 500)
 
     def add_food_to_grid(self) -> None:
         """

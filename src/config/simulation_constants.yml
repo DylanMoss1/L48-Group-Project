@@ -1,6 +1,6 @@
 # Initial number of species places on the grid, as a fraction of the total number of locations on the grid.
 # E.g., a 10x10 grid (100 locations) with NUM_INITIAL_SPECIES_FRACTION=0.2 means 20 species are placed on the grid 
-NUM_INITIAL_SPECIES_FRACTION: 0.3
+NUM_INITIAL_SPECIES_FRACTION: 0.2
 
 # Number of moving and feeding actions made per day
 # NUM_ACTIONS_PER_DAY = MAX_SPEED x SPEED_MODIFIER (@Atreyi what is max speed? Should this be defined in this file?)
