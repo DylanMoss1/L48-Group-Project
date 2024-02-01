@@ -3,12 +3,12 @@ from typing import Dict, Any, List
 from species import Species
 from food import Food
 import math
-from pprint import pprint
 from tabulate import tabulate
 from termcolor import colored
 import constants
 from dataclasses import dataclass
 from numpy.random import normal
+from scipy.stats import truncnorm
 
 
 class Location:
@@ -47,13 +47,13 @@ class Location:
         """
         self.food_list.append(Food())
 
-    def get_species_id_list(self) -> list[Species]:
+    def get_species_id_list(self) -> List[Species]:
         """
         Returns a list containing string(species.id) for each species in self.species_list.
         """
         return [str(species.id) for species in self.species_list]
 
-    def get_food_value_list(self) -> list[Food]:
+    def get_food_value_list(self) -> List[Food]:
         """
         Returns a list containing string(food.value) for each food in self.food_list.
         """
@@ -375,11 +375,6 @@ class World:
         self.species_age()
         num_species_alive = self.species_die()
 
-        # Clean all leftover food
-        for row in self.grid:
-            for location in row:
-                location.food_list = []
-
         log_item = LogItem(self.day, num_species_alive,
                            temperature, probability_of_food, traits_dict)
 
@@ -426,17 +421,19 @@ class World:
                             random.randint(0, self.grid_length_size - 1))
             species_location_set.add(random_tuple)
 
+        normal_gens = {}
+        for key in mutation_start_point:
+            normal_gens[key] = truncnorm(
+                (0 - mutation_start_point[key][0]) / mutation_start_point[key][1],
+                (1 - mutation_start_point[key][0]) / mutation_start_point[key][1],
+                loc=mutation_start_point[key][0], scale=mutation_start_point[key][1]
+            )
         for species_x, species_y in species_location_set:
-
             # Add new species instances at every location in the set
-            size = normal(
-                loc=mutation_start_point["size"][0], scale=mutation_start_point["size"][1])
-            speed = normal(
-                loc=mutation_start_point["speed"][0], scale=mutation_start_point["speed"][1])
-            vision = normal(
-                loc=mutation_start_point["vision"][0], scale=mutation_start_point["vision"][1])
-            aggression = normal(
-                loc=mutation_start_point["aggression"][0], scale=mutation_start_point["aggression"][1])
+            size = normal_gens["size"].rvs()
+            speed = normal_gens["speed"].rvs()
+            vision = normal_gens["vision"].rvs()
+            aggression = normal_gens["aggression"].rvs()
 
             self.grid[species_y][species_x].add_species(
                 Species(size=size, speed=speed, vision=vision, aggression=aggression))
@@ -485,7 +482,7 @@ class World:
             Temperature on the current day
         """
 
-        return 10 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 100)
+        return 23.5 + 10 * math.sin(2 * math.pi * self.day / 100) + (self.day / 500)
 
     def add_food_to_grid(self) -> None:
         """
@@ -511,15 +508,12 @@ class World:
         probability_of_food = scalar * \
             math.exp(-0.5 * (abs(temperature - optimal_temperature) / sigma) ** 2)
 
-        # print(temperature,probability_of_food)
+        #print(probability_of_food)
 
-        sum = 0
         for row in self.grid:
             for location in row:
                 if random.random() < probability_of_food:
                     location.add_food()
-                sum += len(location.food_list)
-        # print("Total food:", sum)
 
         return temperature, probability_of_food
 
@@ -773,20 +767,18 @@ class World:
 
         for row in self.grid:
             for location in row:
-                active_list = [species for species in location.species_list if not species.hibernate]
-                # print(location.species_list, active_list)
-                if len(active_list) > 0 and len(location.food_list) > 0:
-                    if len(active_list) == 1:
-                        for species in active_list:
+                if len(location.species_list) > 0 and len(location.food_list) > 0:
+                    if len(location.species_list) == 1:
+                        for species in location.species_list:
                             species.energy += len(location.food_list) * \
                                 food_value
                     else:
                         aggression = [
-                            species.aggression for species in active_list]
+                            species.aggression for species in location.species_list]
                         if all(aggr <= 0.5 for aggr in aggression):
-                            for species in active_list:
-                                species.energy += len(active_list) * food_value / \
-                                    len(active_list)
+                            for species in location.species_list:
+                                species.energy += len(location.food_list) * food_value / \
+                                    len(location.species_list)
                         else:
                             winner_hawk_indices = [
                                 i for i, j in enumerate(aggression)if j == max(aggression)]
@@ -797,9 +789,9 @@ class World:
                                     max_damage = 0
                             else:
                                 max_damage = max(aggression)
-                            winner_hawk = active_list[random.sample(
+                            winner_hawk = location.species_list[random.sample(
                                 winner_hawk_indices, 1)[0]].id
-                            for species in active_list:
+                            for species in location.species_list:
                                 if species.aggression > 0.5:
                                     if species.id == winner_hawk:
                                         species.energy += len(
@@ -835,12 +827,12 @@ class World:
         for row in self.grid:
             for location in row:
                 for species in location.species_list:
-                    energy_loss = ((0.25 + species.speed)**2) * energy_loss_base
+                    energy_loss = ((1 + species.speed)**2) * energy_loss_base
                     energy_loss += ((species.vision) * energy_loss_base) / 2
                     species.energy -= energy_loss
-                    maximum_stored_energy = species.size * food_value * 10
+                    maximum_stored_energy = reproduction_threshold + species.size * food_value * 10
                     species.energy = min(species.energy, maximum_stored_energy)
-    
+
     def species_age(self) -> None:
         """
         all creatures get older
@@ -851,7 +843,6 @@ class World:
                 for species in location.species_list:
                     species.age += 1
 
-    
     def species_reproduce(self) -> None:
         """
         If a species has more than N energy, they reproduce asexually. The new species has mutated traits, distributed as Normal(μ=parent_trait, σ=trait_mutation_rate)
